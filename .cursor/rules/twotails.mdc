@@ -1,0 +1,80 @@
+---
+description: TWOtails - AI code connectivity analyzer. Traces signals between sender and receiver endpoints.
+globs:
+  - "**/*.{js,jsx,ts,tsx,py}"
+alwaysApply: true
+---
+
+# TWOtails Rules
+
+## Code Analysis Protocol
+
+When analyzing code, follow this exact order:
+
+1. **Parse the file** - Extract all function calls, definitions, imports, events
+2. **Trace connections** - For each call, find the definition
+3. **Match signals** - Send signal from sender, send signal from receiver
+4. **Verify collision** - If signals meet = connected, if not = broken
+5. **Report results** - Show table with status and suggested fixes
+
+## Signal Tracing Rules
+
+### For Function Calls
+- Sender: Function call site (file:line)
+- Receiver: Function definition (file:line)
+- Match by: Function name
+
+### For Event Handlers
+- Sender: onClick/onSubmit attribute (file:line)
+- Receiver: Handler function definition (file:line)
+- Match by: Handler name
+
+### For API Calls
+- Sender: fetch/axios call (file:line)
+- Receiver: Route handler (file:line)
+- Match by: Endpoint path
+
+### For Imports
+- Sender: import statement (file:line)
+- Receiver: Usage in code (file:line)
+- Match by: Import name
+
+## Virtual Memory Testing
+
+Before marking anything as "working":
+
+1. Create isolated browser sandbox
+2. Load the component/page
+3. Interact with UI elements
+4. Verify expected behavior
+5. If working → cleanup and mark verified
+6. If broken → fix and retest
+
+## Output Format
+
+Always present results as:
+
+| Type | Sender | Receiver | Status | Action |
+|------|--------|----------|--------|--------|
+| onClick | Button (L23) | handleClick() | ✗ MISS | Define function |
+| API | fetch('/users') | /api/users | ✓ OK | — |
+| Import | utils.js | formatDate() | ✗ DEAD | Remove import |
+
+## Auto-Fix Protocol
+
+When fixing issues:
+
+1. Detect the problem
+2. Apply the minimal fix
+3. Create virtual memory
+4. Test the fix
+5. If working → cleanup
+6. If broken → try next fix
+7. Repeat until working
+
+## Never Do
+
+- Never skip signal tracing
+- Never assume a connection works without testing
+- Never leave virtual memory running
+- Never fix without verifying

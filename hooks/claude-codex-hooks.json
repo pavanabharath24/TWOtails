@@ -1,0 +1,21 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "type": "command",
+        "command": "node",
+        "args": ["hooks/twotails-activate.js"],
+        "timeout": 5000
+      }
+    ],
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": "node",
+        "args": ["hooks/twotails-instructions.js"],
+        "matcher": "write|edit|bash",
+        "timeout": 5000
+      }
+    ]
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "name": "@pavana/twotails",
+  "version": "1.0.0",
+  "description": "Two signals, one truth. Every connection verified. AI code connectivity analyzer with virtual memory testing.",
+  "keywords": ["opencode-plugin", "opencode", "twotails", "code-analysis", "signal-tracing", "virtual-memory", "ai-code", "connection-checker"],
+  "license": "MIT",
+  "author": {
+    "name": "Pavana",
+    "url": "https://github.com/pavana"
+  },
+  "homepage": "https://github.com/pavana/TWOtails",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pavana/TWOtails.git"
+  },
+  "bugs": {
+    "url": "https://github.com/pavana/TWOtails/issues"
+  },
+  "main": "./.opencode/plugins/twotails.mjs",
+  "bin": {
+    "twotails": "./src/index.js"
+  },
+  "exports": {
+    ".": "./.opencode/plugins/twotails.mjs",
+    "./plugin": "./.opencode/plugins/twotails.mjs"
+  },
+  "files": [
+    "AGENTS.md",
+    "hooks/",
+    "skills/",
+    "src/",
+    ".opencode/",
+    ".cursor/",
+    ".github/",
+    "scripts/",
+    "assets/",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test tests/*.test.js",
+    "dev": "node --watch src/index.js",
+    "lint": "eslint src/",
+    "scan": "node src/index.js scan",
+    "trace": "node src/index.js trace",
+    "test:virtual": "node src/index.js test",
+    "fix": "node src/index.js fix"
+  },
+  "pi": {
+    "extensions": ["./pi-extension/index.js"],
+    "skills": ["./skills"]
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "tree-sitter": "^0.22.0",
+    "tree-sitter-javascript": "^0.23.0",
+    "tree-sitter-typescript": "^0.23.0",
+    "tree-sitter-python": "^0.23.0",
+    "playwright": "^1.45.0",
+    "cli-table3": "^0.6.5",
+    "chalk": "^4.1.2",
+    "commander": "^12.0.0",
+    "glob": "^10.4.0"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "prettier": "^3.3.0"
+  }
+}
