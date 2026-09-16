@@ -26,7 +26,7 @@ const { SecurityScanner } = require('./analyzer/security-scanner');
 const { EnvironmentAnalyzer } = require('./analyzer/env-analyzer');
 const { SignalMatcher } = require('./tracer/signal-matcher');
 const { generateReport } = require('./reporter/table-generator');
-const { runVirtualMemoryTests } = require('./virtual-memory/memory-manager');
+const { runVirtualMemoryTests } = require('./virtual-memory/runner');
 
 const program = new Command();
 

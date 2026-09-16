@@ -51,7 +51,8 @@
   ],
   "scripts": {
     "start": "node src/index.js",
-    "test": "node --test tests/*.test.js",
+    "test": "node --test tests/analyzer.test.js tests/integration.test.js",
+    "test:virtual": "node --test tests/virtual-memory.test.js",
     "dev": "node --watch src/index.js",
     "scan": "node src/index.js scan",
     "trace": "node src/index.js trace",

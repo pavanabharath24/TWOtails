@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Broken App Test</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    .container { max-width: 800px; margin: 0 auto; }
+    button { padding: 10px 20px; margin: 5px; cursor: pointer; border: 1px solid #ccc; border-radius: 4px; }
+    button.primary { background: #007bff; color: white; border-color: #007bff; }
+    button.danger { background: #dc3545; color: white; border-color: #dc3545; }
+    form { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 4px; }
+    input { display: block; width: 100%; padding: 8px; margin: 8px 0; border: 1px solid #ccc; border-radius: 4px; }
+    label { display: block; margin: 8px 0 4px; font-weight: 500; }
+    .error { color: #dc3545; font-size: 14px; display: none; }
+    .error.visible { display: block; }
+    .success { color: #28a745; font-size: 14px; display: none; }
+    .success.visible { display: block; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin: 10px 0; }
+    nav a { margin: 0 10px; color: #007bff; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container" id="root">
+    <h1>TwoTails Test App</h1>
+
+    <nav>
+      <a href="/home">Home</a>
+      <a href="/about">About</a>
+      <a href="/contact">Contact</a>
+    </nav>
+
+    <div class="card">
+      <h2>User Card</h2>
+      <p>This is a test card component</p>
+    </div>
+
+    <button class="primary" data-action="alert" data-message="Save clicked">Save</button>
+    <button class="danger" data-action="alert" data-message="Delete clicked">Delete</button>
+    <button data-action="alert" data-message="Edit clicked">Edit</button>
+
+    <form id="testForm">
+      <label for="name">Name</label>
+      <input type="text" id="name" name="name" placeholder="Enter name" required>
+
+      <label for="email">Email</label>
+      <input type="email" id="email" name="email" placeholder="Enter email" required>
+
+      <div class="error" id="errorMsg">Please fill in all required fields</div>
+      <div class="success" id="successMsg">Form submitted successfully!</div>
+
+      <button type="submit" class="primary">Submit Form</button>
+    </form>
+  </div>
+
+  <script>
+    // Track interactions for testing
+    window.__testState = {
+      clickCount: 0,
+      formSubmitted: false,
+      lastAction: null
+    };
+
+    document.addEventListener('click', function(e) {
+      window.__testState.clickCount++;
+      window.__testState.lastAction = e.target.textContent;
+
+      if (e.target.dataset.action === 'alert') {
+        console.log('Button clicked:', e.target.dataset.message);
+      }
+    });
+
+    document.addEventListener('submit', function(e) {
+      e.preventDefault();
+      window.__testState.formSubmitted = true;
+
+      const form = e.target;
+      const name = form.querySelector('#name')?.value;
+      const email = form.querySelector('#email')?.value;
+
+      if (name && email) {
+        document.getElementById('successMsg').classList.add('visible');
+        document.getElementById('errorMsg').classList.remove('visible');
+        console.log('Form submitted:', { name, email });
+      } else {
+        document.getElementById('errorMsg').classList.add('visible');
+        document.getElementById('successMsg').classList.remove('visible');
+      }
+    });
+  </script>
+</body>
+</html>

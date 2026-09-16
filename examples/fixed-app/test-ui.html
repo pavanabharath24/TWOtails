@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Fixed App Test</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    .container { max-width: 800px; margin: 0 auto; }
+    button { padding: 10px 20px; margin: 5px; cursor: pointer; border: 1px solid #ccc; border-radius: 4px; }
+    button.primary { background: #28a745; color: white; border-color: #28a745; }
+    form { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 4px; }
+    input { display: block; width: 100%; padding: 8px; margin: 8px 0; border: 1px solid #ccc; border-radius: 4px; }
+    label { display: block; margin: 8px 0 4px; font-weight: 500; }
+    .error { color: #dc3545; font-size: 14px; display: none; }
+    .error.visible { display: block; }
+    .success { color: #28a745; font-size: 14px; display: none; }
+    .success.visible { display: block; }
+    nav a { margin: 0 10px; color: #007bff; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container" id="root">
+    <h1>Fixed App</h1>
+
+    <nav>
+      <a href="/dashboard">Dashboard</a>
+      <a href="/settings">Settings</a>
+    </nav>
+
+    <button class="primary" data-action="alert" data-message="Save">Save Changes</button>
+
+    <form id="userForm">
+      <label for="username">Username</label>
+      <input type="text" id="username" name="username" placeholder="Username" required>
+
+      <div class="error" id="error">Required field</div>
+      <div class="success" id="success">Saved!</div>
+
+      <button type="submit" class="primary">Save</button>
+    </form>
+  </div>
+
+  <script>
+    window.__testState = { clickCount: 0, formSubmitted: false };
+    document.addEventListener('click', () => window.__testState.clickCount++);
+    document.addEventListener('submit', function(e) {
+      e.preventDefault();
+      window.__testState.formSubmitted = true;
+      document.getElementById('success').classList.add('visible');
+    });
+  </script>
+</body>
+</html>
