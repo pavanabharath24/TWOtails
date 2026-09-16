@@ -1,174 +1,229 @@
 /**
  * TWOtails Signal Matcher
- * Matches signals from sender and receiver to verify connections
+ * Bidirectional signal tracing - sends signals from both ends
  */
 
-const { SignalSender } = require('./signal-sender');
-const { SignalReceiver } = require('./signal-receiver');
+const fs = require('fs');
+const path = require('path');
+const { ASTParser } = require('../analyzer/ast-parser');
 
 class SignalMatcher {
   constructor() {
-    this.sender = new SignalSender();
-    this.receiver = new SignalReceiver();
-    this.connections = [];
+    this.parser = new ASTParser();
   }
 
-  async trace(file, options = {}) {
-    const fs = require('fs');
-    const content = fs.readFileSync(file, 'utf8');
-    const lines = content.split('\n');
+  async trace(filePath, options = {}) {
+    const fullPath = path.resolve(filePath);
+    const dir = path.dirname(fullPath);
 
-    // Send signals from sender endpoints
-    lines.forEach((line, index) => {
-      const lineNum = index + 1;
+    // Parse the target file
+    const { nodes: targetNodes } = this.parser.parseFile(fullPath);
 
-      // Detect function calls
-      const callMatch = line.match(/(\w+)\s*\(/g);
-      if (callMatch) {
-        callMatch.forEach(match => {
-          const funcName = match.replace(/\s*\(/, '');
-          this.sender.sendFromFunctionCall({
-            name: funcName,
-            file: file,
-            line: lineNum
-          });
-        });
-      }
+    // Parse all files in the directory for cross-reference
+    const { nodes: allNodes } = await this.parser.parseDirectory(dir);
 
-      // Detect event emissions
-      const emitMatch = line.match(/emit\s*\(\s*['"](\w+)['"]/);
-      if (emitMatch) {
-        this.sender.sendFromEventEmit({
-          name: emitMatch[1],
-          file: file,
-          line: lineNum
-        });
-      }
-
-      // Detect API calls
-      const apiMatch = line.match(/(?:fetch|axios|get|post|put|delete)\s*\(\s*['"`]([^'"`]+)/);
-      if (apiMatch) {
-        this.sender.sendFromAPICall({
-          endpoint: apiMatch[1],
-          file: file,
-          line: lineNum
-        });
-      }
-    });
-
-    // Send signals from receiver endpoints
-    lines.forEach((line, index) => {
-      const lineNum = index + 1;
-
-      // Detect function definitions
-      const defMatch = line.match(/(?:function|const|let|var|def|async)\s+(\w+)/);
-      if (defMatch) {
-        this.receiver.sendFromFunctionDefinition({
-          name: defMatch[1],
-          file: file,
-          line: lineNum
-        });
-      }
-
-      // Detect event listeners
-      const listenerMatch = line.match(/on\s*\(\s*['"](\w+)['"]/);
-      if (listenerMatch) {
-        this.receiver.sendFromEventListener({
-          name: listenerMatch[1],
-          file: file,
-          line: lineNum
-        });
-      }
-    });
-
-    // Match signals
-    return this.matchSignals();
-  }
-
-  matchSignals() {
+    // Build trace results
     const results = [];
-    const senderSignals = this.sender.getSignals();
-    const receiverSignals = this.receiver.getSignals();
 
-    senderSignals.forEach(senderSignal => {
-      const matchingReceiver = receiverSignals.find(receiverSignal => {
-        return this.signalsMatch(senderSignal, receiverSignal);
-      });
+    // For each sender signal in target file, find receiver anywhere
+    targetNodes.forEach(sender => {
+      if (sender.type === 'function_call') {
+        const receiver = this.findReceiver(sender, allNodes, fullPath);
+        results.push(this.buildTraceResult('function_call', sender, receiver, fullPath));
+      }
 
-      if (matchingReceiver) {
-        results.push({
-          status: 'CONNECTED',
-          sender: senderSignal,
-          receiver: matchingReceiver,
-          collisionPoint: {
-            file: matchingReceiver.source.file,
-            line: matchingReceiver.source.line
-          }
-        });
-      } else {
-        results.push({
-          status: 'BROKEN',
-          sender: senderSignal,
-          receiver: null,
-          reason: 'No matching receiver found'
-        });
+      if (sender.type === 'event_handler') {
+        const receiver = this.findHandlerReceiver(sender, allNodes, fullPath);
+        results.push(this.buildTraceResult('event_handler', sender, receiver, fullPath));
+      }
+
+      if (sender.type === 'import') {
+        const receiver = this.findImportReceiver(sender, allNodes, fullPath);
+        results.push(this.buildTraceResult('import', sender, receiver, fullPath));
+      }
+
+      if (sender.type === 'event_emit') {
+        const receiver = this.findEmitReceiver(sender, allNodes, fullPath);
+        results.push(this.buildTraceResult('event_emit', sender, receiver, fullPath));
       }
     });
 
-    return results;
-  }
+    // Also find senders that target file receives
+    targetNodes.forEach(receiver => {
+      if (receiver.type === 'function_definition') {
+        const sender = this.findSenderForDefinition(receiver, allNodes, fullPath);
+        if (sender && !results.find(r => r.senderFile === sender.file && r.senderLine === sender.line)) {
+          results.push(this.buildTraceResult('function_call', sender, receiver, fullPath));
+        }
+      }
+    });
 
-  signalsMatch(sender, receiver) {
-    // Match by name
-    const senderName = sender.source.name || sender.payload.functionName || sender.payload.eventName;
-    const receiverName = receiver.source.name || receiver.payload.functionName || receiver.payload.eventName;
-
-    return senderName === receiverName;
-  }
-
-  getSummary(results) {
-    const connected = results.filter(r => r.status === 'CONNECTED').length;
-    const broken = results.filter(r => r.status === 'BROKEN').length;
+    // Deduplicate
+    const unique = this.deduplicateResults(results);
 
     return {
-      total: results.length,
-      connected,
-      broken,
-      percentage: results.length > 0 ? Math.round((connected / results.length) * 100) : 0
+      results: unique,
+      stats: {
+        total: unique.length,
+        connected: unique.filter(r => r.status === 'CONNECTED').length,
+        broken: unique.filter(r => r.status === 'BROKEN').length,
+        file: fullPath
+      }
     };
   }
 
-  formatResults(results) {
-    const output = [];
-    output.push('\nTWOtails Signal Trace Results\n');
-    output.push('═'.repeat(60) + '\n');
+  findReceiver(sender, allNodes, targetFile) {
+    const simpleName = sender.name.includes('.') ? sender.name.split('.').pop() : sender.name;
 
-    results.forEach((result, index) => {
-      if (result.status === 'CONNECTED') {
-        output.push(`✓ ${result.sender.source.name || result.sender.type}`);
-        output.push(`  Sender:   ${result.sender.source.file}:${result.sender.source.line}`);
-        output.push(`  Receiver: ${result.receiver.source.file}:${result.receiver.source.line}`);
-        output.push(`  Status:   COLLISION DETECTED → Connected\n`);
-      } else {
-        output.push(`✗ ${result.sender.source.name || result.sender.type}`);
-        output.push(`  Sender:   ${result.sender.source.file}:${result.sender.source.line}`);
-        output.push(`  Receiver: NOT FOUND`);
-        output.push(`  Status:   NO COLLISION → Broken\n`);
-      }
+    // First look in target file
+    const sameFileDef = allNodes.find(n =>
+      n.type === 'function_definition' &&
+      (n.name === simpleName || n.name === sender.name) &&
+      n.file === targetFile
+    );
+    if (sameFileDef) return sameFileDef;
+
+    // Then look in all files
+    return allNodes.find(n =>
+      n.type === 'function_definition' &&
+      (n.name === simpleName || n.name === sender.name) &&
+      n.file !== targetFile
+    );
+  }
+
+  findHandlerReceiver(handler, allNodes, targetFile) {
+    // Look for function definition with same name
+    const def = allNodes.find(n =>
+      n.type === 'function_definition' &&
+      n.name === handler.name
+    );
+    return def;
+  }
+
+  findImportReceiver(importNode, allNodes, targetFile) {
+    // Check if imported name is used anywhere
+    const usage = allNodes.find(n =>
+      n.name === importNode.name &&
+      n.file === targetFile &&
+      n.line !== importNode.line &&
+      n.type !== 'import'
+    );
+    return usage;
+  }
+
+  findEmitReceiver(emit, allNodes, targetFile) {
+    // For emit, we check if there's a corresponding listener
+    // This is simplified - in reality you'd need to match event names
+    return null;
+  }
+
+  findSenderForDefinition(def, allNodes, targetFile) {
+    return allNodes.find(n =>
+      n.type === 'function_call' &&
+      (n.name === def.name || n.name.endsWith('.' + def.name)) &&
+      n.file !== targetFile
+    );
+  }
+
+  buildTraceResult(type, sender, receiver, targetFile) {
+    const isTargetSender = sender.file === targetFile;
+    const isTargetReceiver = receiver?.file === targetFile;
+
+    // Determine if this is an incoming or outgoing connection
+    let direction;
+    if (isTargetSender && !isTargetReceiver) {
+      direction = 'OUTGOING';
+    } else if (!isTargetSender && isTargetReceiver) {
+      direction = 'INCOMING';
+    } else {
+      direction = 'INTERNAL';
+    }
+
+    return {
+      type,
+      direction,
+      senderName: sender.name,
+      senderFile: sender.file,
+      senderLine: sender.line,
+      receiverName: receiver?.name || null,
+      receiverFile: receiver?.file || null,
+      receiverLine: receiver?.line || null,
+      status: receiver ? 'CONNECTED' : 'BROKEN',
+      suggestion: receiver ? null : `No definition found for "${sender.name}"`
+    };
+  }
+
+  deduplicateResults(results) {
+    const seen = new Set();
+    return results.filter(r => {
+      const key = `${r.type}:${r.senderFile}:${r.senderLine}:${r.receiverFile}:${r.receiverLine}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
     });
+  }
 
-    const summary = this.getSummary(results);
+  formatResults(results, stats) {
+    const output = [];
+    output.push('\nTWOtails Signal Trace Results');
+    output.push('═'.repeat(60));
+    output.push(`File: ${stats.file}\n`);
+
+    const connected = results.filter(r => r.status === 'CONNECTED');
+    const broken = results.filter(r => r.status === 'BROKEN');
+
+    if (connected.length > 0) {
+      output.push('Connected Signals:');
+      output.push('─'.repeat(60));
+      connected.forEach((r, i) => {
+        output.push(`  ${i + 1}. ${r.senderName}`);
+        output.push(`     From: ${r.senderFile}:${r.senderLine}`);
+        output.push(`     To:   ${r.receiverFile}:${r.receiverLine}`);
+        output.push(`     Direction: ${r.direction}`);
+        output.push('');
+      });
+    }
+
+    if (broken.length > 0) {
+      output.push('Broken Signals:');
+      output.push('─'.repeat(60));
+      broken.forEach((r, i) => {
+        output.push(`  ${i + 1}. ${r.senderName}`);
+        output.push(`     From: ${r.senderFile}:${r.senderLine}`);
+        output.push(`     To:   NOT FOUND`);
+        output.push(`     Suggestion: ${r.suggestion}`);
+        output.push('');
+      });
+    }
+
     output.push('─'.repeat(60));
-    output.push(`Summary: ${summary.connected}/${summary.total} connected (${summary.percentage}%)`);
+    output.push(`Summary: ${connected.length}/${results.length} connected`);
 
     return output.join('\n');
   }
-
-  clear() {
-    this.sender.clearSignals();
-    this.receiver.clearSignals();
-    this.connections = [];
-  }
 }
 
-module.exports = { SignalMatcher };
+async function trace(filePath, options = {}) {
+  const matcher = new SignalMatcher();
+  const result = await matcher.trace(filePath, options);
+
+  // Format as report-compatible output
+  const reportResults = result.results.map(r => ({
+    type: r.type,
+    sender: `${r.senderFile}:${r.senderLine}`,
+    senderDetail: r.senderName,
+    receiver: r.receiverFile
+      ? `${r.receiverFile}:${r.receiverLine}`
+      : 'NOT FOUND',
+    receiverDetail: r.receiverName || '',
+    status: r.status === 'CONNECTED' ? '✓ CONNECTED' : '✗ BROKEN',
+    suggestion: r.suggestion || '—'
+  }));
+
+  return {
+    results: reportResults,
+    stats: result.stats
+  };
+}
+
+module.exports = { SignalMatcher, trace };

@@ -4,98 +4,42 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
-const { SignalSender } = require('../src/tracer/signal-sender');
-const { SignalReceiver } = require('../src/tracer/signal-receiver');
-const { SignalMatcher } = require('../src/tracer/signal-matcher');
-
-describe('SignalSender', () => {
-  it('should create signal from function call', () => {
-    const sender = new SignalSender();
-    const signal = sender.sendFromFunctionCall({
-      name: 'handleSubmit',
-      file: 'App.js',
-      line: 45
-    });
-
-    assert.ok(signal.id, 'Should have id');
-    assert.strictEqual(signal.type, 'function_call');
-    assert.strictEqual(signal.source.name, 'handleSubmit');
-  });
-
-  it('should create signal from event emit', () => {
-    const sender = new SignalSender();
-    const signal = sender.sendFromEventEmit({
-      name: 'save',
-      file: 'Form.js',
-      line: 23
-    });
-
-    assert.ok(signal.id, 'Should have id');
-    assert.strictEqual(signal.type, 'event_emit');
-    assert.strictEqual(signal.source.name, 'save');
-  });
-});
-
-describe('SignalReceiver', () => {
-  it('should create signal from function definition', () => {
-    const receiver = new SignalReceiver();
-    const signal = receiver.sendFromFunctionDefinition({
-      name: 'handleSubmit',
-      file: 'handlers.js',
-      line: 12
-    });
-
-    assert.ok(signal.id, 'Should have id');
-    assert.strictEqual(signal.type, 'function_definition');
-    assert.strictEqual(signal.source.name, 'handleSubmit');
-  });
-
-  it('should create signal from event listener', () => {
-    const receiver = new SignalReceiver();
-    const signal = receiver.sendFromEventListener({
-      name: 'save',
-      file: 'EventManager.js',
-      line: 8
-    });
-
-    assert.ok(signal.id, 'Should have id');
-    assert.strictEqual(signal.type, 'event_listener');
-    assert.strictEqual(signal.source.name, 'save');
-  });
-});
+const path = require('path');
+const { SignalMatcher, trace } = require('../src/tracer/signal-matcher');
 
 describe('SignalMatcher', () => {
-  it('should match signals with same name', () => {
+  it('should trace a file and return results', async () => {
     const matcher = new SignalMatcher();
+    const result = await matcher.trace(path.join(__dirname, '..', 'examples', 'broken-app', 'app.jsx'));
 
-    matcher.sender.sendFromFunctionCall({
-      name: 'test',
-      file: 'a.js',
-      line: 1
-    });
-
-    matcher.receiver.sendFromFunctionDefinition({
-      name: 'test',
-      file: 'b.js',
-      line: 2
-    });
-
-    const results = matcher.matchSignals();
-    assert.strictEqual(results.length, 1);
-    assert.strictEqual(results[0].status, 'CONNECTED');
+    assert.ok(result.results, 'Should have results');
+    assert.ok(result.stats, 'Should have stats');
+    assert.ok(result.stats.total > 0, 'Should find signals');
   });
 
-  it('should detect broken connections', () => {
+  it('should detect connected signals', async () => {
     const matcher = new SignalMatcher();
+    const result = await matcher.trace(path.join(__dirname, '..', 'examples', 'fixed-app', 'app.jsx'));
 
-    matcher.sender.sendFromFunctionCall({
-      name: 'missing',
-      file: 'a.js',
-      line: 1
-    });
+    const connected = result.results.filter(r => r.status === 'CONNECTED');
+    assert.ok(connected.length > 0, 'Should find connected signals');
+  });
 
-    const results = matcher.matchSignals();
-    assert.strictEqual(results.length, 1);
-    assert.strictEqual(results[0].status, 'BROKEN');
+  it('should detect broken signals', async () => {
+    const matcher = new SignalMatcher();
+    const result = await matcher.trace(path.join(__dirname, '..', 'examples', 'broken-app', 'app.jsx'));
+
+    const broken = result.results.filter(r => r.status === 'BROKEN');
+    assert.ok(broken.length > 0, 'Should find broken signals');
+  });
+});
+
+describe('trace', () => {
+  it('should return formatted results', async () => {
+    const result = await trace(path.join(__dirname, '..', 'examples', 'broken-app', 'app.jsx'));
+
+    assert.ok(result.results, 'Should have results');
+    assert.ok(result.stats, 'Should have stats');
+    assert.ok(Array.isArray(result.results), 'Results should be array');
   });
 });

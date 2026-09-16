@@ -18,17 +18,9 @@ AI code connectivity analyzer. Traces signals between sender and receiver endpoi
 5. If signals meet = Connected ✓
 6. If signals don't meet = Broken ✗
 
-### Virtual Memory Testing
-1. Create isolated browser sandbox
-2. Load the component/page
-3. Interact with UI elements
-4. Verify expected behavior
-5. If working → cleanup and mark verified
-6. If broken → fix, retest, repeat
-
-## Output Format
+### Output Format
 Always present as a table:
-| Type | Sender | Receiver | Status | Action |
-|------|--------|----------|--------|--------|
+| Type | Sender | Receiver | Status | Suggestion |
+|------|--------|----------|--------|------------|
 | onClick | Button | handleClick | ✗ MISS | Define function |
 | API | fetch('/users') | /api/users | ✓ OK | — |

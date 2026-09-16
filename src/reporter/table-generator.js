@@ -1,128 +1,130 @@
 /**
  * TWOtails Table Generator
- * Generates formatted tables for connection reports
+ * Accurate table output for connection reports
  */
 
 const Table = require('cli-table3');
 const chalk = require('chalk');
 
-class TableGenerator {
-  constructor(options = {}) {
-    this.colorize = options.colorize !== false;
-    this.style = options.style || 'full';
+function generateReport(data) {
+  const { results, stats } = data;
+
+  // Print header
+  console.log('\n' + chalk.bold.cyan('TWOtails Connection Report'));
+  console.log(chalk.gray('═'.repeat(70)));
+
+  if (stats) {
+    console.log(chalk.white(`Files scanned:     ${stats.filesScanned || 0}`));
+    console.log(chalk.white(`Connections:       ${stats.totalConnections || results.length}`));
+    console.log(chalk.green(`Connected:         ${stats.connected || results.filter(r => r.status.includes('CONNECTED')).length}`));
+    console.log(chalk.red(`Broken:            ${stats.broken || results.filter(r => r.status.includes('BROKEN')).length}`));
+    if (stats.parseErrors) {
+      console.log(chalk.yellow(`Parse warnings:    ${stats.parseErrors}`));
+    }
+    console.log('');
   }
 
-  generateConnectionReport(results) {
-    const table = new Table({
-      head: ['#', 'Type', 'Sender', 'Receiver', 'Status', 'Action'].map(h =>
-        this.colorize ? chalk.bold.cyan(h) : h
-      ),
-      colWidths: [5, 15, 30, 30, 12, 30],
-      style: {
-        head: ['cyan'],
-        border: ['grey']
-      }
-    });
+  // Build table
+  const table = new Table({
+    head: ['#', 'Type', 'Sender', 'Receiver', 'Status', 'Suggested Fix'].map(h =>
+      chalk.bold.cyan(h)
+    ),
+    colWidths: [5, 18, 35, 35, 14, 40],
+    style: {
+      head: ['cyan'],
+      border: ['gray']
+    },
+    wordWrap: true
+  });
 
-    results.forEach((result, index) => {
-      const status = result.status === '✓ CONNECTED'
-        ? (this.colorize ? chalk.green(result.status) : result.status)
-        : (this.colorize ? chalk.red(result.status) : result.status);
+  results.forEach((result, index) => {
+    const status = result.status.includes('CONNECTED')
+      ? chalk.green(result.status)
+      : result.status.includes('BROKEN')
+        ? chalk.red(result.status)
+        : chalk.yellow(result.status);
 
-      table.push([
-        index + 1,
-        result.type,
-        result.sender,
-        result.receiver,
-        status,
-        result.action
-      ]);
-    });
+    table.push([
+      index + 1,
+      result.type,
+      `${result.senderDetail || ''}\n${chalk.gray(result.sender)}`,
+      result.receiver !== 'NOT FOUND'
+        ? `${result.receiverDetail || ''}\n${chalk.gray(result.receiver)}`
+        : chalk.red('NOT FOUND'),
+      status,
+      result.suggestion || '—'
+    ]);
+  });
 
-    return table.toString();
+  console.log(table.toString());
+
+  // Print summary
+  const connected = results.filter(r => r.status.includes('CONNECTED')).length;
+  const broken = results.filter(r => r.status.includes('BROKEN')).length;
+  const warnings = results.filter(r => r.status.includes('WARNING')).length;
+
+  console.log('\n' + chalk.gray('─'.repeat(70)));
+
+  if (broken === 0 && warnings === 0) {
+    console.log(chalk.green.bold('✓ All connections verified working'));
+  } else {
+    if (broken > 0) {
+      console.log(chalk.red.bold(`✗ ${broken} broken connection${broken > 1 ? 's' : ''} found`));
+    }
+    if (warnings > 0) {
+      console.log(chalk.yellow.bold(`⚠ ${warnings} warning${warnings > 1 ? 's' : ''}`));
+    }
   }
 
-  generateSignalTrace(results) {
-    const table = new Table({
-      head: ['Signal', 'Type', 'Source', 'Target', 'Status'].map(h =>
-        this.colorize ? chalk.bold.cyan(h) : h
-      ),
-      colWidths: [20, 15, 35, 35, 12],
-      style: {
-        head: ['cyan'],
-        border: ['grey']
-      }
-    });
-
-    results.forEach((result, index) => {
-      const status = result.status === 'CONNECTED'
-        ? (this.colorize ? chalk.green('✓ COLLISION') : 'CONNECTED')
-        : (this.colorize ? chalk.red('✗ NO COLLISION') : 'BROKEN');
-
-      table.push([
-        `${result.sender.source.name || result.sender.type}_${index}`,
-        result.sender.type,
-        `${result.sender.source.file}:${result.sender.source.line}`,
-        result.receiver
-          ? `${result.receiver.source.file}:${result.receiver.source.line}`
-          : 'NOT FOUND',
-        status
-      ]);
-    });
-
-    return table.toString();
-  }
-
-  generateVirtualMemoryReport(results) {
-    const table = new Table({
-      head: ['Element', 'File', 'Result', 'Time'].map(h =>
-        this.colorize ? chalk.bold.cyan(h) : h
-      ),
-      colWidths: [25, 30, 10, 10],
-      style: {
-        head: ['cyan'],
-        border: ['grey']
-      }
-    });
-
-    results.forEach(result => {
-      const status = result.status === 'PASSED'
-        ? (this.colorize ? chalk.green('✓ PASS') : 'PASS')
-        : (this.colorize ? chalk.red('✗ FAIL') : 'FAIL');
-
-      table.push([
-        result.element || result.file,
-        result.file,
-        status,
-        result.time || '—'
-      ]);
-    });
-
-    return table.toString();
-  }
-
-  generateSummary(stats) {
-    const table = new Table({
-      head: ['Metric', 'Value'].map(h =>
-        this.colorize ? chalk.bold.cyan(h) : h
-      ),
-      colWidths: [25, 15],
-      style: {
-        head: ['cyan'],
-        border: ['grey']
-      }
-    });
-
-    table.push(
-      ['Files Scanned', stats.filesScanned || 0],
-      ['Connections Found', stats.connectionsFound || 0],
-      ['Issues Detected', stats.issuesDetected || 0],
-      ['Connected', this.colorize ? chalk.green(stats.connected || 0) : stats.connected || 0],
-      ['Broken', this.colorize ? chalk.red(stats.broken || 0) : stats.broken || 0]
-    );
-
-    return table.toString();
-  }
+  console.log('');
 }
 
-module.exports = { TableGenerator };
+function generateTraceReport(data) {
+  const { results, stats } = data;
+
+  console.log('\n' + chalk.bold.cyan('TWOtails Signal Trace'));
+  console.log(chalk.gray('═'.repeat(70)));
+  console.log(chalk.white(`File: ${stats.file}\n`));
+
+  const table = new Table({
+    head: ['#', 'Type', 'Direction', 'Sender', 'Receiver', 'Status'].map(h =>
+      chalk.bold.cyan(h)
+    ),
+    colWidths: [5, 18, 12, 35, 35, 14],
+    style: {
+      head: ['cyan'],
+      border: ['gray']
+    },
+    wordWrap: true
+  });
+
+  results.forEach((result, index) => {
+    const status = result.status.includes('CONNECTED')
+      ? chalk.green(result.status)
+      : chalk.red(result.status);
+
+    table.push([
+      index + 1,
+      result.type,
+      result.direction || '—',
+      `${result.senderDetail || ''}\n${chalk.gray(result.sender)}`,
+      result.receiver !== 'NOT FOUND'
+        ? `${result.receiverDetail || ''}\n${chalk.gray(result.receiver)}`
+        : chalk.red('NOT FOUND'),
+      status
+    ]);
+  });
+
+  console.log(table.toString());
+
+  const connected = results.filter(r => r.status.includes('CONNECTED')).length;
+  const broken = results.filter(r => r.status.includes('BROKEN')).length;
+
+  console.log('\n' + chalk.gray('─'.repeat(70)));
+  console.log(chalk.white(`Traced: ${results.length} signals`));
+  console.log(chalk.green(`Connected: ${connected}`));
+  console.log(chalk.red(`Broken: ${broken}`));
+  console.log('');
+}
+
+module.exports = { generateReport, generateTraceReport };
