@@ -1,8 +1,21 @@
 {
   "name": "@pavana/twotails",
-  "version": "1.0.0",
-  "description": "Two signals, one truth. Every connection verified. AI code connectivity analyzer with virtual memory testing.",
-  "keywords": ["opencode-plugin", "opencode", "twotails", "code-analysis", "signal-tracing", "virtual-memory", "ai-code", "connection-checker"],
+  "version": "2.0.0",
+  "description": "AI code connectivity analyzer - checks every line for correctness, detects database issues, API problems, security vulnerabilities, and AI hallucinations.",
+  "keywords": [
+    "opencode-plugin",
+    "opencode",
+    "twotails",
+    "code-analysis",
+    "signal-tracing",
+    "virtual-memory",
+    "ai-code",
+    "connection-checker",
+    "security-scanner",
+    "database-analyzer",
+    "api-analyzer",
+    "ai-quality"
+  ],
   "license": "MIT",
   "author": {
     "name": "Pavana",
@@ -42,7 +55,13 @@
     "dev": "node --watch src/index.js",
     "scan": "node src/index.js scan",
     "trace": "node src/index.js trace",
-    "report": "node src/index.js report"
+    "report": "node src/index.js report",
+    "security": "node src/index.js security",
+    "database": "node src/index.js database",
+    "api": "node src/index.js api",
+    "ai-quality": "node src/index.js ai-quality",
+    "env": "node src/index.js env",
+    "test:virtual": "node src/index.js test"
   },
   "publishConfig": {
     "access": "public"
@@ -51,10 +70,10 @@
     "acorn": "^8.12.0",
     "acorn-jsx": "^5.3.2",
     "acorn-walk": "^8.3.0",
-    "playwright": "^1.45.0",
-    "cli-table3": "^0.6.5",
     "chalk": "^4.1.2",
+    "cli-table3": "^0.6.5",
     "commander": "^12.0.0",
-    "glob": "^10.4.0"
+    "glob": "^10.4.0",
+    "playwright": "^1.63.0"
   }
 }
