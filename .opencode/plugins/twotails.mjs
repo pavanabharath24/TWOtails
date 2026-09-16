@@ -1,6 +1,6 @@
 /**
  * TWOtails OpenCode Plugin
- * AI code connectivity analyzer
+ * AI code quality analyzer with 6 specialized scanners
  */
 
 const fs = require('fs');
@@ -37,8 +37,8 @@ function injectInstructions() {
 
 module.exports = {
   name: 'twotails',
-  version: '1.0.0',
-  description: 'AI code connectivity analyzer - traces signals between sender and receiver endpoints',
+  version: '2.0.0',
+  description: 'AI code quality analyzer - 6 scanners, 1 truth, zero false positives',
   
   hooks: {
     'session:start': async (context) => {
@@ -73,14 +73,86 @@ module.exports = {
     },
     {
       name: 'twotails-scan',
-      description: 'Scan codebase for broken connections and missing functions',
+      description: 'Full analysis: connectivity, database, API, security, AI quality, env',
       handler: async (args) => {
         const dir = args[0] || './';
-        const { scan } = require('../../src/analyzer/ast-parser');
-        const results = await scan(dir, {});
+        const { MasterAnalyzer } = require('../../src/analyzer/master-analyzer');
+        const analyzer = new MasterAnalyzer();
+        const result = await analyzer.analyzeDirectory(dir, {});
         
-        const broken = results.filter(r => r.status.includes('BROKEN'));
-        return `Found ${broken.length} broken connections in ${results.length} total connections`;
+        return `Found ${result.stats.totalIssues} issues (${result.stats.errors} errors, ${result.stats.warnings} warnings) in ${result.stats.filesScanned} files`;
+      }
+    },
+    {
+      name: 'twotails-connectivity',
+      description: 'Check connections: function calls, event handlers, imports',
+      handler: async (args) => {
+        const dir = args[0] || './';
+        const { LineByLineAnalyzer } = require('../../src/analyzer/line-analyzer');
+        const analyzer = new LineByLineAnalyzer();
+        const result = await analyzer.analyzeDirectory(dir, {});
+        
+        return `Connectivity: ${result.stats.totalIssues} issues (${result.stats.errors} errors, ${result.stats.warnings} warnings)`;
+      }
+    },
+    {
+      name: 'twotails-database',
+      description: 'Check database: models, queries, migrations, relations',
+      handler: async (args) => {
+        const dir = args[0] || './';
+        const { DatabaseAnalyzer } = require('../../src/analyzer/database-analyzer');
+        const analyzer = new DatabaseAnalyzer();
+        const result = await analyzer.analyzeDirectory(dir, {});
+        
+        return `Database: ${result.stats.modelsFound} models, ${result.stats.queriesFound} queries, ${result.stats.issues} issues`;
+      }
+    },
+    {
+      name: 'twotails-api',
+      description: 'Check API routes: endpoints, middleware, handlers, validation',
+      handler: async (args) => {
+        const dir = args[0] || './';
+        const { APIRouteAnalyzer } = require('../../src/analyzer/api-analyzer');
+        const analyzer = new APIRouteAnalyzer();
+        const result = await analyzer.analyzeDirectory(dir, {});
+        
+        return `API: ${result.stats.routesFound} routes, ${result.stats.issues} issues`;
+      }
+    },
+    {
+      name: 'twotails-security',
+      description: 'Scan for vulnerabilities, secrets, and security issues',
+      handler: async (args) => {
+        const dir = args[0] || './';
+        const { SecurityScanner } = require('../../src/analyzer/security-scanner');
+        const scanner = new SecurityScanner();
+        const result = await scanner.scanDirectory(dir, {});
+        
+        return `Security: ${result.stats.secrets} secrets, ${result.stats.vulnerabilities} vulnerabilities, ${result.stats.issues} issues`;
+      }
+    },
+    {
+      name: 'twotails-ai-quality',
+      description: 'Detect AI hallucinations, deprecated patterns, common mistakes',
+      handler: async (args) => {
+        const dir = args[0] || './';
+        const { AICodeQualityScanner } = require('../../src/analyzer/ai-quality-scanner');
+        const scanner = new AICodeQualityScanner();
+        const result = await scanner.scanDirectory(dir, {});
+        
+        return `AI Quality: ${result.stats.hallucinations} hallucinations, ${result.stats.deprecated} deprecated, ${result.stats.issues} issues`;
+      }
+    },
+    {
+      name: 'twotails-env',
+      description: 'Check environment variables, .env files, config',
+      handler: async (args) => {
+        const dir = args[0] || './';
+        const { EnvironmentAnalyzer } = require('../../src/analyzer/env-analyzer');
+        const analyzer = new EnvironmentAnalyzer();
+        const result = await analyzer.analyzeDirectory(dir, {});
+        
+        return `Environment: ${result.stats.envVarsFound} vars, ${result.stats.issues} issues`;
       }
     },
     {
@@ -94,29 +166,18 @@ module.exports = {
         const matcher = new SignalMatcher();
         const results = await matcher.trace(file);
         
-        return matcher.formatResults(results);
+        return `Trace: ${results.results.length} signals found`;
       }
     },
     {
       name: 'twotails-test',
-      description: 'Test UI elements in virtual memory sandbox',
+      description: 'Test UI elements in virtual memory (real Playwright browser)',
       handler: async (args) => {
         const dir = args[0] || './';
-        const { testVirtualMemory } = require('../../src/virtual-memory/memory-manager');
-        const results = await testVirtualMemory(dir, {});
+        const { runVirtualMemoryTests } = require('../../src/virtual-memory/runner');
+        const results = await runVirtualMemoryTests(dir, {});
         
-        return `Tested ${results.length} elements`;
-      }
-    },
-    {
-      name: 'twotails-fix',
-      description: 'Auto-fix detected issues',
-      handler: async (args) => {
-        const dir = args[0] || './';
-        const { fix } = require('../../src/reporter/results-formatter');
-        await fix(dir, { auto: true });
-        
-        return 'Fixes applied';
+        return `Virtual Memory: ${results.summary.passedSuites}/${results.summary.totalSuites} suites passed, ${results.summary.passedTests}/${results.summary.totalTests} tests passed`;
       }
     },
     {
@@ -124,13 +185,25 @@ module.exports = {
       description: 'Show TWOtails help and commands',
       handler: async () => {
         return `
-TWOtails Commands:
-  /twotails [lite|full|ultra|off] - Set intensity level
-  /twotails-scan [dir] - Scan for broken connections
-  /twotails-trace [file] - Trace signals from file
-  /twotails-test [dir] - Test in virtual memory
-  /twotails-fix [dir] - Auto-fix issues
-  /twotails-help - Show this help
+TWOtails v2.0 - AI Code Quality Analyzer
+═══════════════════════════════════════════
+
+Scan Commands:
+  /twotails-scan [dir]           Full analysis (all 6 scanners)
+  /twotails-connectivity [dir]   Only connectivity checks
+  /twotails-database [dir]       Only database checks
+  /twotails-api [dir]            Only API route checks
+  /twotails-security [dir]       Only security checks
+  /twotails-ai-quality [dir]     Only AI quality checks
+  /twotails-env [dir]            Only environment checks
+
+Test Commands:
+  /twotails-test [dir]           Virtual memory UI testing
+  /twotails-trace [file]         Bidirectional signal tracing
+
+Other:
+  /twotails [lite|full|ultra|off]  Set intensity level
+  /twotails-help                   Show this help
         `.trim();
       }
     }
