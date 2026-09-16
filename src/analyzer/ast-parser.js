@@ -298,7 +298,7 @@ const BUILTINS = new Set([
   'throw', 'try', 'catch', 'finally', 'new', 'delete', 'typeof', 'instanceof',
   'void', 'yield', 'await', 'async', 'function', 'class', 'extends', 'super',
   'import', 'export', 'default', 'from', 'const', 'let', 'var', 'this',
-  'console', 'log', 'error', 'warn', 'info',
+  'console', 'log', 'error', 'warn', 'info', 'debug', 'trace', 'table', 'time', 'timeEnd', 'count', 'clear', 'group', 'groupEnd', 'assert', 'dir', 'dirxml',
   'parseInt', 'parseFloat', 'isNaN', 'isFinite', 'encodeURIComponent', 'decodeURIComponent',
   'setTimeout', 'setInterval', 'clearTimeout', 'clearInterval',
   'JSON', 'Math', 'Date', 'Array', 'Object', 'String', 'Number', 'Boolean', 'RegExp',
@@ -317,14 +317,21 @@ const PROTO_METHODS = new Set([
   'push', 'pop', 'shift', 'unshift', 'splice', 'slice', 'map', 'filter',
   'reduce', 'reduceRight', 'forEach', 'find', 'findIndex', 'some', 'every',
   'isArray', 'from', 'of', 'assign', 'create', 'defineProperty', 'getOwnPropertyDescriptor',
-  'then', 'catch', 'finally', 'resolve', 'reject', 'all', 'race', 'allSettled'
+  'then', 'catch', 'finally', 'resolve', 'reject', 'all', 'race', 'allSettled',
+  'preventDefault', 'stopPropagation', 'stopImmediatePropagation', 'prevent',
+  'addEventListener', 'removeEventListener', 'dispatchEvent',
+  'querySelector', 'querySelectorAll', 'getElementById', 'getElementsByClassName', 'getElementsByTagName',
+  'createElement', 'createTextNode', 'createDocumentFragment'
 ]);
 
 function isBuiltin(name) {
   if (BUILTINS.has(name)) return true;
-  // Check for method calls like str.charAt
+  // Check for method calls like str.charAt or console.log
   if (name.includes('.')) {
-    const method = name.split('.').pop();
+    const parts = name.split('.');
+    const obj = parts[0];
+    const method = parts[parts.length - 1];
+    if (BUILTINS.has(obj)) return true;
     if (PROTO_METHODS.has(method)) return true;
   }
   return false;
