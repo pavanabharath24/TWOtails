@@ -1,6 +1,6 @@
 /**
  * TWOtails Master Analyzer
- * Combines all analyzers into one comprehensive scan
+ * Combines all 13 analyzers into one comprehensive scan
  */
 
 const { LineByLineAnalyzer } = require('./line-analyzer');
@@ -9,6 +9,13 @@ const { APIRouteAnalyzer } = require('./api-analyzer');
 const { AICodeQualityScanner } = require('./ai-quality-scanner');
 const { SecurityScanner } = require('./security-scanner');
 const { EnvironmentAnalyzer } = require('./env-analyzer');
+const { AIPromptScanner } = require('./prompt-scanner');
+const { TokenCounter } = require('./token-counter');
+const { ErrorHandlerAnalyzer } = require('./error-handler-analyzer');
+const { DependencyScanner } = require('./dependency-scanner');
+const { DockerAnalyzer } = require('./docker-analyzer');
+const { WebSocketAnalyzer } = require('./websocket-analyzer');
+const { TestCoverageDetector } = require('./test-coverage-detector');
 
 class MasterAnalyzer {
   constructor() {
@@ -18,7 +25,14 @@ class MasterAnalyzer {
       api: new APIRouteAnalyzer(),
       aiQuality: new AICodeQualityScanner(),
       security: new SecurityScanner(),
-      environment: new EnvironmentAnalyzer()
+      environment: new EnvironmentAnalyzer(),
+      prompt: new AIPromptScanner(),
+      tokens: new TokenCounter(),
+      errorHandling: new ErrorHandlerAnalyzer(),
+      dependencies: new DependencyScanner(),
+      docker: new DockerAnalyzer(),
+      websocket: new WebSocketAnalyzer(),
+      testCoverage: new TestCoverageDetector()
     };
   }
 
@@ -27,19 +41,14 @@ class MasterAnalyzer {
     const allIssues = [];
 
     // Run all analyzers
-    const analyzerNames = Object.keys(this.analyzers);
-
-    for (const name of analyzerNames) {
+    for (const [name, analyzer] of Object.entries(this.analyzers)) {
       try {
-        const analyzer = this.analyzers[name];
         let result;
-
-        if (name === 'aiQuality' || name === 'security') {
+        if (typeof analyzer.scanDirectory === 'function') {
           result = await analyzer.scanDirectory(dirPath, options);
         } else {
           result = await analyzer.analyzeDirectory(dirPath, options);
         }
-
         results[name] = result;
 
         // Collect issues with source tag
@@ -147,12 +156,19 @@ class MasterAnalyzer {
 
   getAnalyzerLabel(source) {
     const labels = {
-      connectivity: 'Connectivity Issues',
-      database: 'Database Issues',
-      api: 'API Route Issues',
-      aiQuality: 'AI Code Quality',
-      security: 'Security Issues',
-      environment: 'Environment Issues'
+      connectivity: 'Connectivity',
+      database: 'Database',
+      api: 'API Routes',
+      aiQuality: 'AI Quality',
+      security: 'Security',
+      environment: 'Environment',
+      prompt: 'AI Prompts',
+      tokens: 'Token Usage',
+      errorHandling: 'Error Handling',
+      dependencies: 'Dependencies',
+      docker: 'Docker',
+      websocket: 'WebSocket',
+      testCoverage: 'Test Coverage'
     };
     return labels[source] || source;
   }

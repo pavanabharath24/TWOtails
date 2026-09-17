@@ -1,20 +1,17 @@
 {
   "name": "@pavana/twotails",
-  "version": "2.0.0",
-  "description": "AI code connectivity analyzer - checks every line for correctness, detects database issues, API problems, security vulnerabilities, and AI hallucinations.",
+  "version": "3.0.0",
+  "description": "AI code quality analyzer - 6 scanners, 1 truth, zero false positives. Detects broken connections, security vulnerabilities, database issues, and AI hallucinations.",
   "keywords": [
     "opencode-plugin",
-    "opencode",
     "twotails",
     "code-analysis",
-    "signal-tracing",
-    "virtual-memory",
     "ai-code",
-    "connection-checker",
     "security-scanner",
     "database-analyzer",
     "api-analyzer",
-    "ai-quality"
+    "virtual-memory",
+    "signal-tracing"
   ],
   "license": "MIT",
   "author": {
@@ -39,14 +36,13 @@
   },
   "files": [
     "AGENTS.md",
-    "hooks/",
-    "skills/",
     "src/",
+    "skills/",
+    "hooks/",
     ".opencode/",
     ".cursor/",
     ".github/",
-    "scripts/",
-    "assets/",
+    "examples/",
     "LICENSE"
   ],
   "scripts": {
@@ -55,14 +51,13 @@
     "test:virtual": "node --test tests/virtual-memory.test.js",
     "dev": "node --watch src/index.js",
     "scan": "node src/index.js scan",
-    "trace": "node src/index.js trace",
-    "report": "node src/index.js report",
     "security": "node src/index.js security",
     "database": "node src/index.js database",
     "api": "node src/index.js api",
     "ai-quality": "node src/index.js ai-quality",
     "env": "node src/index.js env",
-    "test:virtual": "node src/index.js test"
+    "connectivity": "node src/index.js connectivity",
+    "test:ui": "node src/index.js test"
   },
   "publishConfig": {
     "access": "public"

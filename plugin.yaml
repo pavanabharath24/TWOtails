@@ -1,9 +1,0 @@
-name: twotails
-version: 1.0.0
-description: Two signals, one truth. Every connection verified.
-skills:
-  - twotails
-  - twotails-scan
-  - twotails-trace
-  - twotails-test
-  - twotails-fix

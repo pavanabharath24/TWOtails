@@ -67,7 +67,7 @@ add(1, 2, 3);
       const mismatches = result.issues.filter(i => i.type === 'PARAMETER_MISMATCH');
       assert.ok(mismatches.length > 0, 'Should detect parameter mismatch');
     } finally {
-      fs.rmSync(testDir, { recursive: true });
+      if (fs.existsSync(testDir)) fs.rmSync(testDir, { recursive: true });
     }
   });
 });

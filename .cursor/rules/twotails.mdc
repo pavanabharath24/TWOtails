@@ -1,5 +1,5 @@
 ---
-description: TWOtails - AI code connectivity analyzer. Traces signals between sender and receiver endpoints.
+description: TWOtails - AI code quality analyzer with 6 specialized scanners
 globs:
   - "**/*.{js,jsx,ts,tsx,py}"
 alwaysApply: true
@@ -9,13 +9,14 @@ alwaysApply: true
 
 ## Code Analysis Protocol
 
-When analyzing code, follow this exact order:
+When analyzing code, run all 6 scanners:
 
-1. **Parse the file** - Extract all function calls, definitions, imports, events
-2. **Trace connections** - For each call, find the definition
-3. **Match signals** - Send signal from sender, send signal from receiver
-4. **Verify collision** - If signals meet = connected, if not = broken
-5. **Report results** - Show table with status and suggested fixes
+1. **Connectivity** - Function calls, handlers, imports, parameters
+2. **Database** - Models, queries, migrations, relations
+3. **API Routes** - Endpoints, middleware, handlers, validation
+4. **AI Quality** - Hallucinations, deprecated patterns, mistakes
+5. **Security** - Secrets, SQL injection, XSS, command injection
+6. **Environment** - Env vars, .env files, config
 
 ## Signal Tracing Rules
 
@@ -43,12 +44,13 @@ When analyzing code, follow this exact order:
 
 Before marking anything as "working":
 
-1. Create isolated browser sandbox
+1. Create isolated browser sandbox (Playwright)
 2. Load the component/page
-3. Interact with UI elements
-4. Verify expected behavior
-5. If working → cleanup and mark verified
-6. If broken → fix and retest
+3. Interact with UI elements (click, fill, submit)
+4. Verify expected behavior (navigation, state, API calls)
+5. Capture console errors and page errors
+6. Report pass/fail for each test
+7. Cleanup sandbox after testing
 
 ## Output Format
 
@@ -59,18 +61,8 @@ Always present results as:
 | onClick | Button (L23) | handleClick() | ✗ MISS | Define function |
 | API | fetch('/users') | /api/users | ✓ OK | — |
 | Import | utils.js | formatDate() | ✗ DEAD | Remove import |
-
-## Auto-Fix Protocol
-
-When fixing issues:
-
-1. Detect the problem
-2. Apply the minimal fix
-3. Create virtual memory
-4. Test the fix
-5. If working → cleanup
-6. If broken → try next fix
-7. Repeat until working
+| Secret | config.js:12 | — | ✗ EXPOSED | Use env var |
+| SQL | query.js:8 | — | ✗ INJECT | Use parameterized |
 
 ## Never Do
 
@@ -78,3 +70,5 @@ When fixing issues:
 - Never assume a connection works without testing
 - Never leave virtual memory running
 - Never fix without verifying
+- Never hardcode secrets
+- Never use string concatenation in SQL
