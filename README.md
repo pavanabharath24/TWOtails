@@ -20,9 +20,56 @@
 
 ## What is TWOtails?
 
-When AI generates code, things break. Buttons without handlers. Functions called but never defined. SQL injection vulnerabilities. Hardcoded secrets. Missing database models. API routes without validation.
+When AI writes your code, something small is always missing. A button with no
+click handler. A function that is called but never written. A password hiding
+in the code. A database table that was never created. AI moves fast — and it
+leaves these small holes behind.
 
-**TWOtails finds ALL of it.** Fourteen specialized scanners analyze every line of your code across 12 programming languages and report exactly what's broken, what's missing, and what's dangerous.
+**TWOtails is a code checker made for AI-written code.** It works as a skill
+and CLI for **Antigravity, Cursor, Claude Code, Codex, GitHub Copilot,
+OpenCode**, and any agent that reads `AGENTS.md`. You run one command, and it
+reads your whole project and tells you exactly what is broken, what is missing,
+and what is dangerous — with the file name, the line number, and a simple fix
+suggestion.
+
+### What it does
+
+- **Reads every line** of your project with real code parsing (AST), not simple text matching
+- **Checks both ends of every connection** — where a signal is sent, and where
+  it should be received. That is the "two tails" method. If both ends match,
+  the code is fine. If one end is missing, it reports a bug. Because both
+  sides must match before anything is reported, you get **zero false alarms**
+- **Runs 14 scanners** that look for different problems: broken connections,
+  database mistakes, unsafe API routes, security holes, weak environment
+  settings, missing tests, debug leftovers, and more
+- **Understands 12 languages**: JavaScript, TypeScript, Python, Go, Java,
+  Ruby, Rust, PHP, C#, Swift, Kotlin, Scala
+- **Never changes your code** — it only reports problems and shows suggestions
+
+### How it helps AI agents and AI tools
+
+AI agents write code fast, but they cannot always see the whole project at
+once. They may call a function that does not exist, forget to connect a
+button, or leave a secret in the code. TWOtails works like a **second pair of
+eyes** for the agent:
+
+1. The agent writes code
+2. The agent (or you) runs `twotails scan ./src`
+3. TWOtails returns a clear list: file, line, problem, and fix
+4. The agent fixes only the real problems — no guessing, no wasted turns
+
+This stops the agent from looping over the same bug again and again, saves you
+from reading every line of AI code by hand, and keeps broken code out of
+production. A full scan takes about **1 second for a 50-file project**, so an
+agent can run it after every change and still stay fast.
+
+### Who is it for?
+
+- **Developers** who use AI copilots and want a fast safety check before they commit
+- **AI agents and coding assistants** that need real feedback instead of guessing
+- **Teams** that review a lot of AI-generated code every day
+- **CI/CD pipelines** — `twotails scan` exits with error code 1 if broken code is found, so bad code never merges
+- **Code reviewers** who want a pre-checked list of problems before they start reading
 
 ## Profile
 
@@ -357,11 +404,22 @@ twotails test ./
 
 ## Integration
 
+TWOtails ships as a **skill, plugin, hooks, rules file, and `AGENTS.md`** — so
+the same knowledge works across tools:
+
 ### Claude Code
 ```
 /plugin marketplace add pavana/TWOtails
 /plugin install twotails@twotails
 ```
+The bundled hooks live in [`hooks/claude-codex-hooks.json`](hooks/claude-codex-hooks.json)
+and the skills in [`skills/`](skills/) (`twotails`, `twotails-api`,
+`twotails-database`, `twotails-security`, `twotails-virtual-memory`).
+
+### Antigravity, Codex, and any AGENTS.md agent
+Antigravity, Codex, Amp, Jules, Qoder, and others auto-read `AGENTS.md` from
+the project root. Clone this repo, or copy [`AGENTS.md`](AGENTS.md) into your
+project — the analysis rules are active with **zero setup**.
 
 ### OpenCode
 Add to `opencode.json`:
@@ -370,9 +428,16 @@ Add to `opencode.json`:
 ```
 
 ### Cursor
+Copy the rule file into your project (or `~/.cursor/rules/` for all projects):
 ```bash
-git clone https://github.com/pavana/TWOtails
-node TWOtails/scripts/cursor-hooks.js install
+cp .cursor/rules/twotails.mdc <your-project>/.cursor/rules/
+```
+Cursor picks it up automatically — no plugin needed.
+
+### GitHub Copilot
+Copy the instructions file:
+```bash
+cp .github/copilot-instructions.md <your-project>/.github/
 ```
 
 ### CI/CD
@@ -494,6 +559,32 @@ TWOtails/
 ```
 
 ## FAQ
+
+**Who is TWOtails for?**
+Anyone whose code is written by AI: solo developers using copilots, teams that
+review AI-generated code every day, CI/CD pipelines, code reviewers, and the
+AI agents themselves.
+
+**Which tools and agents does it work with?**
+It works as a skill, plugin, hooks, rules file, and `AGENTS.md` for
+**Antigravity, Cursor, Claude Code, Codex, GitHub Copilot, and OpenCode**.
+Anything else that can run a CLI works too — just run `twotails scan ./src`.
+
+**How much does it help AI agents?**
+A lot. Instead of guessing, the agent gets exact file-and-line errors with a
+fix suggestion after every change, so it fixes bugs on the first try instead
+of looping over the same broken file. One scan takes about 1 second, so the
+agent can run it after every edit without slowing down.
+
+**How does it help me, not the agent?**
+You stop reading every line of AI code by hand. TWOtails gives you a checked
+list of real problems before you review, keeps secrets and injection holes out
+of production, and blocks broken code from merging in CI.
+
+**What makes it different from a linter?**
+A linter checks style and simple rules. TWOtails checks *connections*: did the
+sender meet the receiver? That is exactly where AI-generated code usually
+breaks — a button with no handler, a call with no function.
 
 **Does it work with any language?**
 Yes. JavaScript, JSX, TypeScript, TSX (full AST parsing) plus Python, Go, Java,
