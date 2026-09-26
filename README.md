@@ -13,7 +13,6 @@
   <img src="https://img.shields.io/github/v/release/pavana/TWOtails?style=flat-square&color=0ea5e9&label=release" alt="Release">
   <img src="https://img.shields.io/npm/v/@pavana/twotails?style=flat-square&color=0ea5e9&label=npm" alt="npm">
   <img src="https://img.shields.io/badge/tests-55%2F55%20%2B%2017%20Playwright-0ea5e9?style=flat-square" alt="Tests">
-  <img src="https://img.shields.io/badge/license-MIT-0ea5e9?style=flat-square" alt="MIT license">
 </p>
 
 ---
