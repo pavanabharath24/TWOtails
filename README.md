@@ -516,9 +516,6 @@ rate: 0% across the 72-test suite.
 **Does virtual memory need Playwright?**
 Yes. Run `npx playwright install chromium` after installing.
 
-## License
-
-[MIT](LICENSE)
 
 ## Contributions
 
