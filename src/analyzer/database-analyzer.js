@@ -4,7 +4,6 @@
  */
 
 const fs = require('fs');
-const path = require('path');
 
 // ORM/Database patterns to detect
 const DB_PATTERNS = {
@@ -37,13 +36,6 @@ const DB_PATTERNS = {
     pool: /(?:createPool|createConnection|Pool|Connection)\s*\(/
   }
 };
-
-// Common AI mistakes with databases
-const AI_DB_MISTAKES = [
-  { pattern: /(?:await\s+)?(?:\w+\.)?(?:find|findOne|findAll|findByPk)\s*\([^)]*\)(?!\s*\.)/, issue: 'MISSING_AWAIT', message: 'Database query may be missing await' },
-  { pattern: /(?:await\s+)?(?:\w+\.)?(?:create|update|destroy|delete)\s*\([^)]*\)(?!\s*\.)/, issue: 'MISSING_AWAIT', message: 'Database mutation may be missing await' },
-  { pattern: /(?:const|let|var)\s+(\w+)\s*=\s*(?:await\s+)?(?:\w+\.)?(?:find|findOne|findAll)[^;]*;(?!\s*\n\s*(?:if|switch|try|return|\w+\.))/, issue: 'UNHANDLED_RESULT', message: 'Database query result not checked' }
-];
 
 class DatabaseAnalyzer {
   constructor() {

@@ -4,7 +4,6 @@
  */
 
 const fs = require('fs');
-const path = require('path');
 
 // Dockerfile patterns
 const DOCKER_PATTERNS = {

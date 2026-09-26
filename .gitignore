@@ -10,3 +10,9 @@ coverage/
 *.tsbuildinfo
 playwright-report/
 test-results/
+
+# Unrelated local projects
+lipsync-app/
+youtube/
+__pycache__/
+*.pyc

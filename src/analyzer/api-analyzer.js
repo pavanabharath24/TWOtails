@@ -34,11 +34,10 @@ const ROUTE_PATTERNS = {
   }
 };
 
-// Common AI mistakes with routes
+// AI-generated route mistakes that duplicate-free checks catch reliably
 const AI_ROUTE_MISTAKES = [
-  { pattern: /(?:req|request)\s*\.\s*(?:params|query|body)\s*\.\s*(\w+)/, issue: 'UNVALIDATED_INPUT', message: 'Route parameter not validated' },
-  { pattern: /(?:res|response)\s*\.\s*json\s*\(\s*(?:req|request)\s*\.\s*body/, issue: 'SENSITIVE_DATA_EXPOSURE', message: 'Request body directly in response' },
-  { pattern: /(?:res|response)\s*\.\s*send\s*\(\s*(?:`|'|\")\s*\+/, issue: 'XSS_VIA_CONCAT', message: 'String concatenation in response may cause XSS' }
+  { pattern: /(?:res|response)\s*\.\s*json\s*\(\s*(?:req|request)\s*\.\s*body/, issue: 'SENSITIVE_DATA_EXPOSURE', message: 'Request body directly in response', suggestion: 'Return only the required fields instead of the raw request body' },
+  { pattern: /(?:res|response)\s*\.\s*send\s*\(\s*(?:`|'|\")\s*\+/, issue: 'XSS_VIA_CONCAT', message: 'String concatenation in response may cause XSS', suggestion: 'Escape user input or use a templating engine instead of concatenation' }
 ];
 
 class APIRouteAnalyzer {
@@ -75,6 +74,7 @@ class APIRouteAnalyzer {
     this.analyzeMissingAuth();
     this.analyzeDuplicateRoutes();
     this.analyzeMissingParams();
+    this.analyzeAIMistakes();
 
     return {
       routes: this.routes,
@@ -268,10 +268,6 @@ class APIRouteAnalyzer {
       const fileContent = fs.readFileSync(route.file, 'utf8');
       const lines = fileContent.split('\n');
 
-      // Find the handler function
-      const routeLine = lines[route.line - 1] || '';
-      const hasTryCatch = routeLine.includes('try');
-
       // Check next few lines for try/catch
       const start = route.line - 1;
       const end = Math.min(lines.length, route.line + 20);
@@ -379,6 +375,36 @@ class APIRouteAnalyzer {
           suggestion: `Remove unused parameter extraction or use it`
         });
       }
+    });
+  }
+
+  analyzeAIMistakes() {
+    const checkedFiles = new Set();
+    this.routes.forEach(route => {
+      if (checkedFiles.has(route.file)) return;
+      checkedFiles.add(route.file);
+
+      let lines;
+      try {
+        lines = fs.readFileSync(route.file, 'utf8').split('\n');
+      } catch (err) {
+        return;
+      }
+
+      lines.forEach((line, idx) => {
+        AI_ROUTE_MISTAKES.forEach(check => {
+          if (check.pattern.test(line)) {
+            this.issues.push({
+              file: route.file,
+              line: idx + 1,
+              type: check.issue,
+              severity: 'WARNING',
+              message: check.message,
+              suggestion: check.suggestion
+            });
+          }
+        });
+      });
     });
   }
 }

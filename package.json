@@ -1,7 +1,7 @@
 {
   "name": "@pavana/twotails",
-  "version": "3.0.0",
-  "description": "AI code quality analyzer - 6 scanners, 1 truth, zero false positives. Detects broken connections, security vulnerabilities, database issues, and AI hallucinations.",
+  "version": "3.1.0",
+  "description": "AI code quality analyzer - 14 scanners, 1 truth, zero false positives. Supports JavaScript, TypeScript, Python, Go, Java, Ruby, Rust, PHP, C#, Swift, Kotlin, Scala.",
   "keywords": [
     "opencode-plugin",
     "twotails",
@@ -11,7 +11,18 @@
     "database-analyzer",
     "api-analyzer",
     "virtual-memory",
-    "signal-tracing"
+    "signal-tracing",
+    "python",
+    "golang",
+    "java",
+    "ruby",
+    "rust",
+    "php",
+    "csharp",
+    "swift",
+    "kotlin",
+    "scala",
+    "multi-language"
   ],
   "license": "MIT",
   "author": {
@@ -57,7 +68,12 @@
     "ai-quality": "node src/index.js ai-quality",
     "env": "node src/index.js env",
     "connectivity": "node src/index.js connectivity",
-    "test:ui": "node src/index.js test"
+    "languages": "node src/index.js languages",
+    "paywall": "node src/index.js paywall",
+    "test:ui": "node src/index.js test",
+    "export-context": "node scripts/export-context.js",
+    "import-context": "node scripts/import-context.js",
+    "contrib-graph": "node scripts/generate-contribution-graph.js"
   },
   "publishConfig": {
     "access": "public"

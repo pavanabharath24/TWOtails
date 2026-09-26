@@ -88,7 +88,8 @@ const AI_SECURITY_MISTAKES = [
   { pattern: /(?:const|let|var)\s+\w+\s*=\s*(?:new\s+Function|eval)\s*\(/, message: 'Dynamic code execution (potential code injection)', severity: 'ERROR' },
   { pattern: /(?:const|let|var)\s+\w+\s*=\s*require\s*\(\s*(?:req|request|params|query|body)/, message: 'Dynamic require with user input', severity: 'ERROR' },
   { pattern: /(?:process\.env|ENV)\s*\.\s*(\w+)\s*(?::|=)\s*(?:req|request|params|query|body)/, message: 'Setting environment variable from user input', severity: 'ERROR' },
-  { pattern: /(?:const|let|var)\s+\w+\s*=\s*(?:req|request|params|query|body)/, message: 'Direct use of user input without sanitization', severity: 'WARNING' }
+  // Only match actual HTTP request object access (req.body, request.params, etc.)
+  { pattern: /(?:const|let|var)\s+\w+\s*=\s*(?:req|request)\.(?:body|params|query|headers|cookies|file)\b/, message: 'Direct use of user input without sanitization', severity: 'WARNING' }
 ];
 
 class SecurityScanner {

@@ -4,8 +4,6 @@
  * Tests buttons, forms, navigation, API calls, components
  */
 
-const fs = require('fs');
-const path = require('path');
 const { VirtualMemory } = require('./memory-manager');
 
 // ─── Test Result Builder ────────────────────────────────────────

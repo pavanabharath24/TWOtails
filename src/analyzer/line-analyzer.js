@@ -8,7 +8,7 @@ const path = require('path');
 const { glob } = require('glob');
 const acorn = require('acorn');
 const jsx = require('acorn-jsx');
-const walk = require('acorn-walk');
+const { simple: walkSimple } = require('../utils/ast-walk');
 
 // Built-in methods and keywords to ignore
 const BUILTINS = new Set([
@@ -23,7 +23,20 @@ const BUILTINS = new Set([
   'Promise', 'Map', 'Set', 'WeakMap', 'WeakSet', 'Symbol', 'Proxy', 'Reflect',
   'document', 'window', 'navigator', 'location', 'history', 'localStorage', 'sessionStorage',
   'fetch', 'XMLHttpRequest', 'WebSocket',
-  'alert', 'confirm', 'prompt'
+  'alert', 'confirm', 'prompt',
+  // Node.js / module globals
+  'require', 'module', 'exports', 'process', 'Buffer', '__dirname', '__filename',
+  'global', 'globalThis', 'arguments',
+  // ES/browser globals
+  'undefined', 'NaN', 'Infinity', 'structuredClone', 'queueMicrotask', 'performance',
+  'requestAnimationFrame', 'cancelAnimationFrame', 'matchMedia', 'getComputedStyle',
+  'crypto', 'URL', 'URLSearchParams', 'FormData', 'AbortController', 'AbortSignal',
+  'Headers', 'Request', 'Response', 'Blob', 'FileReader', 'Worker', 'Event',
+  'CustomEvent', 'EventSource', 'IntersectionObserver', 'ResizeObserver', 'MutationObserver',
+  'Error', 'TypeError', 'RangeError', 'SyntaxError', 'ReferenceError', 'EvalError', 'URIError',
+  // Test framework globals
+  'describe', 'it', 'test', 'expect', 'beforeAll', 'beforeEach', 'afterAll', 'afterEach',
+  'jest', 'vi', 'chai', 'assert', 'suite', 'mock', 'spyOn'
 ]);
 
 const PROTO_METHODS = new Set([
@@ -65,6 +78,18 @@ class LineByLineAnalyzer {
     this.allHandlers = [];
     this.allReturns = [];
     this.allVariables = new Map(); // name -> {file, line, type, value}
+    this.allVariablesList = [];     // every variable, including name collisions
+    this.fileContents = new Map();  // file -> raw content
+    this.fileBindings = new Map();  // file -> Set of names bound in that file
+    // Two-signal bookkeeping: senders checked against receivers on both ends
+    this.signalStats = {
+      method: 'bidirectional',
+      senders: 0,
+      receivers: 0,
+      connected: 0,
+      broken: 0,
+      unusedImports: 0
+    };
   }
 
   async analyzeDirectory(dirPath, options = {}) {
@@ -95,7 +120,10 @@ class LineByLineAnalyzer {
       }
     }
 
-    // Phase 2: Cross-file analysis
+    // Phase 2: Bidirectional cross-file analysis
+    //   Sender end: calls, event handlers, imports
+    //   Receiver end: function/class/method definitions, exports
+    //   A signal only counts as connected when BOTH ends confirm it
     this.analyzeFunctionCalls();
     this.analyzeEventHandlers();
     this.analyzeImports();
@@ -104,6 +132,9 @@ class LineByLineAnalyzer {
     this.analyzeUnusedVariables();
     this.analyzeUndefinedVariables();
 
+    this.signalStats.senders = this.allCalls.length + this.allHandlers.length + this.allImports.length;
+    this.signalStats.receivers = [...this.allDefinitions.values()].reduce((sum, defs) => sum + defs.length, 0);
+
     return {
       issues: this.issues,
       stats: {
@@ -111,14 +142,20 @@ class LineByLineAnalyzer {
         totalIssues: this.issues.length,
         errors: this.issues.filter(i => i.severity === 'ERROR').length,
         warnings: this.issues.filter(i => i.severity === 'WARNING').length,
-        info: this.issues.filter(i => i.severity === 'INFO').length
+        info: this.issues.filter(i => i.severity === 'INFO').length,
+        signalTracing: { ...this.signalStats }
       }
     };
   }
 
   parseFile(filePath) {
-    const content = fs.readFileSync(filePath, 'utf8');
+    let content = fs.readFileSync(filePath, 'utf8');
     const ext = path.extname(filePath);
+    // Shebang lines are valid in Node scripts but not parseable by acorn
+    if (content.startsWith('#!')) {
+      content = content.replace(/^#![^\n]*/, '');
+    }
+    this.fileContents.set(filePath, content);
 
     if (ext === '.jsx' || ext === '.tsx') {
       try {
@@ -159,13 +196,13 @@ class LineByLineAnalyzer {
     lines.forEach((line, index) => {
       const lineNum = index + 1;
 
-      // Function calls
+      // Function calls (regex guesses - never trusted for signal reporting)
       const callMatches = line.match(/(\w+(?:\.\w+)*)\s*\(/g);
       if (callMatches) {
         callMatches.forEach(match => {
           const name = match.replace(/\s*\(/, '').trim();
           if (!isBuiltin(name)) {
-            this.allCalls.push({ name, file: filePath, line: lineNum, args: [] });
+            this.allCalls.push({ name, file: filePath, line: lineNum, args: [], fromRegex: true });
           }
         });
       }
@@ -178,7 +215,8 @@ class LineByLineAnalyzer {
           file: filePath,
           line: lineNum,
           params,
-          returnType: null
+          returnType: null,
+          fromRegex: true
         }]);
       }
 
@@ -187,7 +225,7 @@ class LineByLineAnalyzer {
       if (importMatch) {
         const names = importMatch[1].split(',').map(n => n.trim());
         names.forEach(name => {
-          this.allImports.push({ name, source: importMatch[2], file: filePath, line: lineNum });
+          this.allImports.push({ name, source: importMatch[2], file: filePath, line: lineNum, fromRegex: true });
         });
       }
 
@@ -198,30 +236,35 @@ class LineByLineAnalyzer {
           event: 'on' + handlerMatch[1],
           name: handlerMatch[2],
           file: filePath,
-          line: lineNum
+          line: lineNum,
+          fromRegex: true
         });
       }
 
       // Variable declarations
       const varMatch = line.match(/(?:const|let|var)\s+(\w+)\s*=\s*(.+)/);
       if (varMatch) {
-        this.allVariables.set(varMatch[1], {
+        const entry = {
           file: filePath,
           line: lineNum,
           type: this.inferType(varMatch[2]),
-          value: varMatch[2]
-        });
+          value: varMatch[2],
+          fromRegex: true
+        };
+        this.allVariables.set(varMatch[1], entry);
+        this.allVariablesList.push({ name: varMatch[1], ...entry });
       }
     });
   }
 
   extractFromAST(ast, filePath, content) {
-    const lines = content.split('\n');
+    if (!this.fileContents.has(filePath)) this.fileContents.set(filePath, content);
+    this.collectBindings(ast, filePath);
 
-    walk.simple(ast, {
+    walkSimple(ast, {
       CallExpression: (node) => {
         const name = this.getCallName(node);
-        if (name && !isBuiltin(name)) {
+        if (name && !isBuiltin(name) && !name.includes('?.')) {
           const args = node.arguments.map(a => this.getArgType(a));
           this.allCalls.push({
             name,
@@ -248,7 +291,42 @@ class LineByLineAnalyzer {
           file: filePath,
           line: node.loc.start.line,
           params,
+          sig: this.describeParams(node.params),
           returnType,
+          node
+        });
+      },
+
+      ClassDeclaration: (node) => {
+        if (node.id?.name) {
+          const name = node.id.name;
+          if (!this.allDefinitions.has(name)) this.allDefinitions.set(name, []);
+          this.allDefinitions.get(name).push({
+            file: filePath,
+            line: node.loc.start.line,
+            params: [],
+            sig: { required: 0, total: 0, hasRest: false, hasDefaults: false },
+            returnType: 'class',
+            kind: 'class',
+            node
+          });
+        }
+      },
+
+      MethodDefinition: (node) => {
+        const name = node.key?.name || (node.key?.type === 'Literal' ? node.key.value : null);
+        if (!name || name === 'constructor') return;
+        if (!this.allDefinitions.has(name)) this.allDefinitions.set(name, []);
+        this.allDefinitions.get(name).push({
+          file: filePath,
+          line: node.loc.start.line,
+          params: (node.value?.params || []).map(p => ({
+            name: p.name || p.left?.name || 'unknown',
+            type: this.inferParamType(p)
+          })),
+          sig: this.describeParams(node.value?.params || []),
+          returnType: null,
+          kind: 'method',
           node
         });
       },
@@ -270,31 +348,56 @@ class LineByLineAnalyzer {
             file: filePath,
             line: node.loc.start.line,
             params,
+            sig: this.describeParams(node.init.params),
             returnType,
             node
           });
         } else {
-          // Regular variable
-          const name = node.id?.name;
-          if (name) {
-            this.allVariables.set(name, {
+          // const x = require('./mod') - binding on the receiver end
+          if (node.init?.type === 'CallExpression' &&
+              node.init.callee?.type === 'Identifier' &&
+              node.init.callee.name === 'require') {
+            const source = node.init.arguments[0]?.type === 'Literal'
+              ? String(node.init.arguments[0].value)
+              : 'unknown';
+            const line = node.loc.start.line;
+            if (node.id?.type === 'Identifier') {
+              this.allImports.push({ name: node.id.name, source, file: filePath, line, isRequire: true });
+            } else if (node.id?.type === 'ObjectPattern') {
+              node.id.properties.forEach(prop => {
+                if (prop.type === 'RestElement') return;
+                const local = prop.value?.name || prop.key?.name;
+                if (local) {
+                  this.allImports.push({ name: local, source, file: filePath, line, isRequire: true });
+                }
+              });
+            }
+          }
+
+          // Regular variable (supports destructuring patterns)
+          this.bindPattern(node.id, (varName) => {
+            const entry = {
               file: filePath,
               line: node.loc.start.line,
               type: this.inferTypeFromNode(node.init),
               value: content.substring(node.init?.start || 0, node.init?.end || 0)
-            });
-          }
+            };
+            this.allVariables.set(varName, entry);
+            this.allVariablesList.push({ name: varName, ...entry });
+          });
         }
       },
 
       ImportDeclaration: (node) => {
         const source = node.source?.value || 'unknown';
+        const isTypeImport = node.importKind === 'type';
         node.specifiers.forEach(spec => {
           this.allImports.push({
             name: spec.local?.name || spec.imported?.name || 'unknown',
             source,
             file: filePath,
-            line: node.loc.start.line
+            line: node.loc.start.line,
+            isTypeImport
           });
         });
       },
@@ -342,6 +445,133 @@ class LineByLineAnalyzer {
     return null;
   }
 
+  // Receiver-end signature: required params, optionals, rest args
+  describeParams(params) {
+    let required = 0;
+    let hasRest = false;
+    let hasDefaults = false;
+    params.forEach(p => {
+      if (p.type === 'RestElement') {
+        hasRest = true;
+      } else if (p.type === 'AssignmentPattern') {
+        hasDefaults = true;
+      } else {
+        required++;
+      }
+    });
+    return { required, total: params.length, hasRest, hasDefaults };
+  }
+
+  // Collect every name bound by a binding pattern (id, destructure, nested)
+  bindPattern(pattern, cb) {
+    if (!pattern) return;
+    switch (pattern.type) {
+      case 'Identifier':
+        cb(pattern.name);
+        break;
+      case 'ObjectPattern':
+        pattern.properties.forEach(prop => {
+          if (prop.type === 'RestElement') {
+            this.bindPattern(prop.argument, cb);
+          } else {
+            this.bindPattern(prop.value || prop.key, cb);
+          }
+        });
+        break;
+      case 'ArrayPattern':
+        pattern.elements.forEach(el => this.bindPattern(el, cb));
+        break;
+      case 'AssignmentPattern':
+        this.bindPattern(pattern.left, cb);
+        break;
+      case 'RestElement':
+        this.bindPattern(pattern.argument, cb);
+        break;
+    }
+  }
+
+  // Names bound inside each file: params, declarations, imports, classes
+  collectBindings(ast, filePath) {
+    const bindings = this.fileBindings.get(filePath) || new Set();
+    const bind = (name) => { if (name) bindings.add(name); };
+
+    const bindParams = (params) => {
+      (params || []).forEach(p => this.bindPattern(p, bind));
+    };
+
+    walkSimple(ast, {
+      FunctionDeclaration: (node) => {
+        bind(node.id?.name);
+        bindParams(node.params);
+      },
+      FunctionExpression: (node) => {
+        bind(node.id?.name);
+        bindParams(node.params);
+      },
+      ArrowFunctionExpression: (node) => {
+        bindParams(node.params);
+      },
+      ClassDeclaration: (node) => bind(node.id?.name),
+      ClassExpression: (node) => bind(node.id?.name),
+      MethodDefinition: (node) => bindParams(node.value?.params),
+      Property: (node) => {
+        if (node.method && node.value) bindParams(node.value.params);
+      },
+      VariableDeclarator: (node) => this.bindPattern(node.id, bind),
+      ImportDeclaration: (node) => {
+        node.specifiers.forEach(spec => bind(spec.local?.name));
+      },
+      CatchClause: (node) => this.bindPattern(node.param, bind)
+    });
+
+    this.fileBindings.set(filePath, bindings);
+  }
+
+  isImported(filePath, name) {
+    if (!name) return false;
+    return this.allImports.some(imp => imp.file === filePath && imp.name === name);
+  }
+
+  // True when the identifier appears somewhere in the file other than
+  // import/require declaration lines (real usage from the receiver end)
+  isUsedOutsideImports(filePath, name, importLine) {
+    const content = this.fileContents.get(filePath);
+    if (!content) return false;
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`\\b${escaped}\\b`);
+    const requireBinding = new RegExp(
+      `(?:const|let|var)\\s*(?:\\{[^}]*\\b${escaped}\\b[^}]*\\}|${escaped})\\s*=\\s*require\\s*\\(`
+    );
+    const lines = content.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      if (i + 1 === importLine) continue;
+      if (/^\s*import\s/.test(lines[i])) continue;
+      if (requireBinding.test(lines[i])) continue;
+      if (pattern.test(lines[i])) return true;
+    }
+    return false;
+  }
+
+  // True when the identifier is used anywhere in the file apart from
+  // being declared on its own line (covers JSX, returns, template use)
+  isUsedOutsideLine(filePath, name, declLine) {
+    const content = this.fileContents.get(filePath);
+    if (!content) return false;
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`\\b${escaped}\\b`, 'g');
+    const lines = content.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const matches = lines[i].match(pattern) || [];
+      if (i + 1 === declLine) {
+        // more than one occurrence on the declaration line means use
+        if (matches.length > 1) return true;
+        continue;
+      }
+      if (matches.length > 0) return true;
+    }
+    return false;
+  }
+
   getArgType(node) {
     if (node.type === 'Literal') return typeof node.value;
     if (node.type === 'Identifier') return 'variable';
@@ -363,7 +593,7 @@ class LineByLineAnalyzer {
     if (node.body?.type === 'BlockStatement') {
       // Look for return statements
       const returns = [];
-      walk.simple(node.body, {
+      walkSimple(node.body, {
         ReturnStatement: (ret) => {
           if (ret.argument) {
             returns.push(this.inferTypeFromNode(ret.argument));
@@ -414,139 +644,214 @@ class LineByLineAnalyzer {
     }));
   }
 
-  // Phase 2: Analysis
+  // Phase 2: Bidirectional analysis
+  //   Sender end emits a signal: call, handler reference, import
+  //   Receiver end confirms it: definition, import binding, file binding
+  //   Both ends must agree before a connection is trusted. A missing
+  //   receiver only becomes an issue when the signal is unambiguous
+  //   (a bare project call or an unresolved handler reference).
 
   analyzeFunctionCalls() {
     this.allCalls.forEach(call => {
-      const defs = this.allDefinitions.get(call.name);
-      if (!defs || defs.length === 0) {
-        this.issues.push({
-          file: call.file,
-          line: call.line,
-          type: 'UNDEFINED_FUNCTION',
-          severity: 'ERROR',
-          message: `Function "${call.name}" is called but never defined`,
-          suggestion: `Define function "${call.name}" or import it`,
-          sender: call.name,
-          receiver: null
-        });
+      if (call.fromRegex) return; // regex guesses are never trusted as senders
+
+      const isDotted = call.name.includes('.');
+      const localName = isDotted ? call.name.split('.').pop() : call.name;
+
+      // Receiver end: definition of the function or its method
+      const defs = this.allDefinitions.get(isDotted ? localName : call.name);
+
+      // Receiver end: import/require binding in the calling file
+      const bound = isDotted
+        ? this.isImported(call.file, call.name.split('.')[0])
+        : this.isImported(call.file, call.name);
+
+      // Receiver end: name bound locally (parameter, variable, destructure)
+      const bindings = this.fileBindings.get(call.file);
+      const locallyBound = !isDotted && !!bindings && bindings.has(call.name);
+
+      if ((defs && defs.length > 0) || bound || locallyBound) {
+        this.signalStats.connected++;
+        return;
       }
+
+      // Dotted calls target objects (req.body, fs.readFile, vm.run):
+      // the receiver is a property of an external object, not a project
+      // symbol. Reporting these is the #1 source of false positives.
+      if (isDotted) return;
+
+      // Receiver end missing for a bare call: a genuine broken signal
+      this.signalStats.broken++;
+      this.issues.push({
+        file: call.file,
+        line: call.line,
+        type: 'UNDEFINED_FUNCTION',
+        severity: 'ERROR',
+        message: `Function "${call.name}" is called but never defined`,
+        suggestion: `Define function "${call.name}" or import it`,
+        sender: call.name,
+        receiver: null
+      });
     });
   }
 
   analyzeEventHandlers() {
     this.allHandlers.forEach(handler => {
       const defs = this.allDefinitions.get(handler.name);
-      if (!defs || defs.length === 0) {
-        this.issues.push({
-          file: handler.file,
-          line: handler.line,
-          type: 'MISSING_HANDLER',
-          severity: 'ERROR',
-          message: `Event handler "${handler.name}" is referenced but not defined`,
-          suggestion: `Define handler function "${handler.name}" or import it`,
-          sender: `${handler.event}={${handler.name}}`,
-          receiver: null
-        });
+      if (defs && defs.length > 0) {
+        this.signalStats.connected++;
+        return;
       }
+      if (this.isImported(handler.file, handler.name)) {
+        this.signalStats.connected++;
+        return;
+      }
+      // Receiver end: handler bound in the same file (param, variable)
+      const bindings = this.fileBindings.get(handler.file);
+      if (bindings && bindings.has(handler.name)) {
+        this.signalStats.connected++;
+        return;
+      }
+
+      this.signalStats.broken++;
+      this.issues.push({
+        file: handler.file,
+        line: handler.line,
+        type: 'MISSING_HANDLER',
+        severity: 'ERROR',
+        message: `Event handler "${handler.name}" is referenced but not defined`,
+        suggestion: `Define handler function "${handler.name}" or import it`,
+        sender: `${handler.event}={${handler.name}}`,
+        receiver: null
+      });
     });
   }
 
   analyzeImports() {
     this.allImports.forEach(imp => {
-      // Check if imported name is used anywhere
-      const used = this.allCalls.some(c => c.name === imp.name && c.file === imp.file && c.line !== imp.line) ||
-                   this.allHandlers.some(h => h.name === imp.name && h.file === imp.file);
+      // Type-only imports vanish at compile time
+      if (imp.isTypeImport) return;
+      if (imp.source.endsWith('.d.ts') || imp.source.endsWith('/types')) return;
 
-      // Check if it's a type-only import (TypeScript)
-      const isTypeImport = imp.source.endsWith('.d.ts') || imp.source.endsWith('/types');
-
-      if (!used && !isTypeImport) {
-        this.issues.push({
-          file: imp.file,
-          line: imp.line,
-          type: 'UNUSED_IMPORT',
-          severity: 'WARNING',
-          message: `Import "${imp.name}" from "${imp.source}" is never used`,
-          suggestion: `Remove unused import "${imp.name}"`,
-          sender: imp.name,
-          receiver: null
-        });
+      // React is consumed implicitly by the JSX runtime
+      const content = this.fileContents.get(imp.file) || '';
+      if (imp.source === 'react' && /<[A-Za-z]/.test(content)) {
+        this.signalStats.connected++;
+        return;
       }
+
+      // Receiver end: the name is referenced elsewhere in the file
+      const used = this.isUsedOutsideImports(imp.file, imp.name, imp.line);
+      if (used) {
+        this.signalStats.connected++;
+        return;
+      }
+
+      this.signalStats.unusedImports++;
+      this.issues.push({
+        file: imp.file,
+        line: imp.line,
+        type: 'UNUSED_IMPORT',
+        severity: 'WARNING',
+        message: `Import "${imp.name}" from "${imp.source}" is never used`,
+        suggestion: `Remove unused import "${imp.name}"`,
+        sender: imp.name,
+        receiver: null
+      });
     });
   }
 
   analyzeParameters() {
     this.allCalls.forEach(call => {
+      if (call.fromRegex) return;
+      if (call.name.includes('.')) return; // property call - arity of external method unknown
+
       const defs = this.allDefinitions.get(call.name);
-      if (!defs || defs.length === 0) return;
+      if (!defs || defs.length === 0) return; // already reported as broken signal
+      if (this.isImported(call.file, call.name)) return; // external symbol - arity unknown
 
-      const def = defs[0]; // Use first definition
-      const expectedParams = def.params.length;
-      const providedArgs = call.args.length;
+      // Receiver end confirms: at least one definition accepts this arity
+      const matches = defs.some(def => this.arityMatches(def, call.args.length));
+      if (matches) return;
 
-      if (expectedParams !== providedArgs) {
-        this.issues.push({
-          file: call.file,
-          line: call.line,
-          type: 'PARAMETER_MISMATCH',
-          severity: 'ERROR',
-          message: `Function "${call.name}" expects ${expectedParams} parameters but got ${providedArgs}`,
-          suggestion: `Provide ${expectedParams} arguments to "${call.name}"`,
-          sender: call.name,
-          receiver: `${def.file}:${def.line}`
-        });
-      }
+      const def = defs[0];
+      const expectedParams = def.sig ? def.sig.total : def.params.length;
+      this.issues.push({
+        file: call.file,
+        line: call.line,
+        type: 'PARAMETER_MISMATCH',
+        severity: 'ERROR',
+        message: `Function "${call.name}" expects ${expectedParams} parameters but got ${call.args.length}`,
+        suggestion: `Provide ${expectedParams} arguments to "${call.name}"`,
+        sender: call.name,
+        receiver: `${def.file}:${def.line}`
+      });
     });
   }
 
+  arityMatches(def, provided) {
+    if (def.fromRegex || !def.sig) return true; // signature unverified - never report
+    const { required, total, hasRest, hasDefaults } = def.sig;
+    if (hasRest) return provided >= required;
+    if (hasDefaults) return provided >= required && provided <= total;
+    return provided === total;
+  }
+
   analyzeReturnTypes() {
+    const GLOBALS = new Set([
+      'undefined', 'NaN', 'Infinity', 'globalThis', 'window', 'document',
+      'process', 'console', 'module', 'exports', 'arguments',
+      '__dirname', '__filename', 'global', 'this', 'null'
+    ]);
     this.allReturns.forEach(ret => {
-      if (ret.value && ret.value.type === 'Identifier') {
-        // Check if returned variable exists
-        const varDef = this.allVariables.get(ret.value.name);
-        if (!varDef) {
-          // Check if it's a function call result
-          const callDef = this.allCalls.find(c => c.name === ret.value.name);
-          if (!callDef) {
-            this.issues.push({
-              file: ret.file,
-              line: ret.line,
-              type: 'UNDEFINED_VARIABLE',
-              severity: 'ERROR',
-              message: `Return variable "${ret.value.name}" is not defined`,
-              suggestion: `Define variable "${ret.value.name}" before returning`,
-              sender: ret.value.name,
-              receiver: null
-            });
-          }
-        }
-      }
+      if (!ret.value || ret.value.type !== 'Identifier') return;
+      const name = ret.value.name;
+      if (GLOBALS.has(name)) return;
+
+      // Receiver end: name bound somewhere in this file
+      const bindings = this.fileBindings.get(ret.file);
+      if (bindings && bindings.has(name)) return;
+      if (this.allDefinitions.has(name)) return;
+      if (this.isImported(ret.file, name)) return;
+
+      this.issues.push({
+        file: ret.file,
+        line: ret.line,
+        type: 'UNDEFINED_VARIABLE',
+        severity: 'ERROR',
+        message: `Return variable "${name}" is not defined`,
+        suggestion: `Define variable "${name}" before returning`,
+        sender: name,
+        receiver: null
+      });
     });
   }
 
   analyzeUnusedVariables() {
-    this.allVariables.forEach((varDef, name) => {
-      // Skip exported variables
+    const seen = new Set();
+    this.allVariablesList.forEach(varDef => {
+      const name = varDef.name;
       if (name === 'default' || name.startsWith('_')) return;
+      const key = `${varDef.file}:${varDef.line}:${name}`;
+      if (seen.has(key)) return;
+      seen.add(key);
 
-      // Check if variable is used
-      const used = this.allCalls.some(c => c.name === name && c.file === varDef.file && c.line !== varDef.line) ||
-                   this.allHandlers.some(h => h.name === name && h.file === varDef.file) ||
-                   this.allReturns.some(r => r.value?.name === name && r.file === varDef.file);
+      const content = this.fileContents.get(varDef.file) || '';
+      // Exported names are part of the module's API
+      if (new RegExp(`\\bexport\\b[^\\n]*\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(content)) return;
 
-      if (!used) {
-        this.issues.push({
-          file: varDef.file,
-          line: varDef.line,
-          type: 'UNUSED_VARIABLE',
-          severity: 'WARNING',
-          message: `Variable "${name}" is declared but never used`,
-          suggestion: `Remove unused variable "${name}" or use it`,
-          sender: name,
-          receiver: null
-        });
-      }
+      if (this.isUsedOutsideLine(varDef.file, name, varDef.line)) return;
+
+      this.issues.push({
+        file: varDef.file,
+        line: varDef.line,
+        type: 'UNUSED_VARIABLE',
+        severity: 'WARNING',
+        message: `Variable "${name}" is declared but never used`,
+        suggestion: `Remove unused variable "${name}" or use it`,
+        sender: name,
+        receiver: null
+      });
     });
   }
 
@@ -560,8 +865,12 @@ class LineByLineAnalyzer {
         return;
       }
 
+      // Only same-file variables can make a handler reference wrong;
+      // names from other files are either imported or unrelated
+      const sameFileVar = varDef && varDef.file === handler.file ? varDef : null;
+
       // If it's a variable but not a function
-      if (varDef && !funcDef) {
+      if (sameFileVar && !funcDef) {
         this.issues.push({
           file: handler.file,
           line: handler.line,
@@ -570,7 +879,7 @@ class LineByLineAnalyzer {
           message: `"${handler.name}" is a variable, not a function - cannot be used as event handler`,
           suggestion: `Define "${handler.name}" as a function`,
           sender: handler.name,
-          receiver: `${varDef.file}:${varDef.line}`
+          receiver: `${sameFileVar.file}:${sameFileVar.line}`
         });
       }
     });

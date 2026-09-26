@@ -8,7 +8,7 @@ const path = require('path');
 const { glob } = require('glob');
 const acorn = require('acorn');
 const jsx = require('acorn-jsx');
-const walk = require('acorn-walk');
+const { simple: walkSimple } = require('../utils/ast-walk');
 
 // Built-in methods to ignore
 const BUILTINS = new Set([
@@ -134,7 +134,7 @@ class SignalMatcher {
         allowReturnOutsideFunction: true
       });
 
-      walk.simple(ast, {
+      walkSimple(ast, {
         CallExpression: (node) => {
           const name = this.getCallName(node);
           if (name && !isBuiltin(name)) {

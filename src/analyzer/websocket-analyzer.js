@@ -4,10 +4,8 @@
  */
 
 const fs = require('fs');
-const path = require('path');
 const acorn = require('acorn');
 const jsx = require('acorn-jsx');
-const walk = require('acorn-walk');
 
 // WebSocket patterns
 const WS_PATTERNS = {
@@ -205,7 +203,7 @@ class WebSocketAnalyzer {
   checkLine(filePath, line, lineNum) {
     if (line.trim().startsWith('//') || line.trim().startsWith('*')) return;
 
-    for (const [name, check] of Object.entries(WS_PATTERNS)) {
+    for (const [, check] of Object.entries(WS_PATTERNS)) {
       if (check.pattern.test(line)) {
         if (check.type === 'WEBSOCKET_CONNECTION' || check.type === 'SOCKET_IO_CONNECTION') {
           this.connections.push({

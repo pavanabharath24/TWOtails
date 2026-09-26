@@ -2,7 +2,8 @@
 
 /**
  * TWOtails - AI Code Quality Analyzer
- * 13 scanners, 1 truth, zero false positives
+ * 14 scanners, 1 truth, zero false positives
+ * Supports: JavaScript, TypeScript, Python, Go, Java, Ruby, Rust, PHP, C#, Swift, Kotlin, Scala
  */
 
 const { Command } = require('commander');
@@ -21,28 +22,33 @@ const { DependencyScanner } = require('./analyzer/dependency-scanner');
 const { DockerAnalyzer } = require('./analyzer/docker-analyzer');
 const { WebSocketAnalyzer } = require('./analyzer/websocket-analyzer');
 const { TestCoverageDetector } = require('./analyzer/test-coverage-detector');
+const { MultiLanguageAnalyzer } = require('./analyzer/multi-language-analyzer');
+const { PaywallConnectionAnalyzer } = require('./analyzer/paywall-analyzer');
 const { SignalMatcher } = require('./tracer/signal-matcher');
 const { generateReport } = require('./reporter/table-generator');
 const { runVirtualMemoryTests } = require('./virtual-memory/runner');
+
+// Print paths relative to the current directory for readable output
+const rel = (filePath) => path.relative(process.cwd(), filePath) || '.';
 
 const program = new Command();
 
 program
   .name('twotails')
-  .description('AI code quality analyzer - 13 scanners, 1 truth, zero false positives')
-  .version('3.0.0');
+  .description('AI code quality analyzer - 14 scanners, 1 truth, zero false positives')
+  .version('3.1.0');
 
 // ─── FULL SCAN ───────────────────────────────────────────────────
 program
   .command('scan [directory]')
-  .description('Full analysis: all 13 scanners')
-  .option('-e, --extensions <exts>', 'File extensions to scan', '.js,.jsx,.ts,.tsx')
+  .description('Full analysis: all 14 scanners, every supported language, bidirectional signal tracing')
+  .option('-e, --extensions <exts>', 'JS/TS file extensions for AST scanners', '.js,.jsx,.ts,.tsx')
   .option('-i, --ignore <dirs>', 'Directories to ignore', 'node_modules,dist,.git,coverage')
   .option('-s, --severity <level>', 'Minimum severity (ERROR, WARNING, INFO)', 'INFO')
   .option('--json', 'Output as JSON')
   .action(async (directory, options) => {
     const dir = directory || './';
-    console.log(`\nTWOtails Full Scan: ${path.resolve(dir)}\n`);
+    console.log(`\nTWOtails Full Scan: ${rel(path.resolve(dir))}\n`);
 
     const analyzer = new MasterAnalyzer();
     const result = await analyzer.analyzeDirectory(dir, options);
@@ -57,7 +63,7 @@ program
       );
 
       console.log(result.summary);
-      console.log('\nDetailed Issues:\n');
+      console.log('\nDetailed Issues:');
 
       const bySource = {};
       filteredIssues.forEach(issue => {
@@ -67,12 +73,12 @@ program
 
       Object.entries(bySource).forEach(([source, issues]) => {
         console.log(`\n${getAnalyzerLabel(source)} (${issues.length} issues):`);
-        console.log('─'.repeat(60));
+        console.log('─'.repeat(64));
 
         issues.forEach((issue, i) => {
           const severity = issue.severity === 'ERROR' ? '✗' : issue.severity === 'WARNING' ? '⚠' : 'ℹ';
           const line = issue.line ? `:${issue.line}` : '';
-          console.log(`  ${severity} ${issue.file}${line}`);
+          console.log(`  ${severity} ${rel(issue.file)}${line}`);
           console.log(`    ${issue.message}`);
           if (issue.suggestion) {
             console.log(`    → ${issue.suggestion}`);
@@ -117,7 +123,7 @@ scanners.forEach(({ name, desc, Class, isScanDir }) => {
         result.issues.forEach(issue => {
           const severity = issue.severity === 'ERROR' ? '✗' : issue.severity === 'WARNING' ? '⚠' : 'ℹ';
           const line = issue.line ? `:${issue.line}` : '';
-          console.log(`  ${severity} ${issue.file}${line}`);
+          console.log(`  ${severity} ${rel(issue.file)}${line}`);
           console.log(`    ${issue.message}`);
           console.log(`    → ${issue.suggestion}\n`);
         });
@@ -264,9 +270,120 @@ function getAnalyzerLabel(source) {
     dependencies: 'Dependencies',
     docker: 'Docker',
     websocket: 'WebSocket',
-    testCoverage: 'Test Coverage'
+    testCoverage: 'Test Coverage',
+    multiLanguage: 'Multi-Language'
   };
   return labels[source] || source;
 }
+
+// ─── MULTI-LANGUAGE SCAN ───────────────────────────────────────
+program
+  .command('languages [directory]')
+  .description('Scan Python, Go, Java, Ruby, Rust, PHP, C#, Swift, Kotlin, Scala')
+  .option('-i, --ignore <dirs>', 'Directories to ignore', 'node_modules,dist,.git,coverage,__pycache__,vendor,target')
+  .option('--json', 'Output as JSON')
+  .action(async (directory, options) => {
+    const dir = directory || './';
+    console.log(`\nTWOtails Multi-Language Scan: ${path.resolve(dir)}\n`);
+
+    const analyzer = new MultiLanguageAnalyzer();
+    const result = await analyzer.analyzeDirectory(dir, options);
+
+    if (options.json) {
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
+
+    console.log('TWOtails Multi-Language Analysis');
+    console.log('═'.repeat(60));
+    console.log(`Files scanned: ${result.stats.filesScanned}`);
+    console.log(`Languages detected: ${result.stats.languagesDetected.join(', ')}`);
+    console.log(`Total issues: ${result.stats.issues}`);
+    console.log(`Errors: ${result.stats.errors}`);
+    console.log(`Warnings: ${result.stats.warnings}`);
+    console.log('');
+
+    if (result.issues.length === 0) {
+      console.log('✓ No issues found\n');
+      return;
+    }
+
+    // Group by language
+    const byLanguage = {};
+    result.issues.forEach(issue => {
+      const ext = path.extname(issue.file);
+      const lang = analyzer.supportedExtensions[ext] || 'unknown';
+      if (!byLanguage[lang]) byLanguage[lang] = [];
+      byLanguage[lang].push(issue);
+    });
+
+    Object.entries(byLanguage).forEach(([lang, issues]) => {
+      console.log(`${lang.charAt(0).toUpperCase() + lang.slice(1)} (${issues.length} issues):`);
+      console.log('─'.repeat(64));
+      issues.forEach(issue => {
+        const icon = issue.severity === 'ERROR' ? '✗' : issue.severity === 'WARNING' ? '⚠' : 'ℹ';
+        console.log(`  ${icon} ${rel(issue.file)}:${issue.line}`);
+        console.log(`    ${issue.message}`);
+        console.log(`    → ${issue.suggestion}`);
+        console.log('');
+      });
+    });
+  });
+
+// ─── PAYWALL SCAN ────────────────────────────────────────────────
+program
+  .command('paywall [directory]')
+  .description('Verify paywall connections (RevenueCat, Stripe, Paddle, App Store, Play Store)')
+  .option('-i, --ignore <dirs>', 'Directories to ignore', 'node_modules,dist,.git,coverage')
+  .option('--json', 'Output as JSON')
+  .action(async (directory, options) => {
+    const dir = directory || './';
+    console.log(`\nTWOtails Paywall Connection Scan: ${path.resolve(dir)}\n`);
+
+    const analyzer = new PaywallConnectionAnalyzer();
+    const result = await analyzer.analyzeDirectory(dir, options);
+
+    if (options.json) {
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
+
+    console.log('TWOtails Paywall Connection Analysis');
+    console.log('═'.repeat(60));
+    console.log(`Files scanned: ${result.stats.filesScanned}`);
+    console.log('Providers detected:');
+    Object.entries(result.stats.providers).forEach(([provider, count]) => {
+      if (count > 0) console.log(`  ${provider}: ${count} files`);
+    });
+    console.log(`Total issues: ${result.stats.issues}`);
+    console.log(`Errors: ${result.stats.errors}`);
+    console.log(`Warnings: ${result.stats.warnings}`);
+    console.log('');
+
+    if (result.issues.length === 0) {
+      console.log('✓ No paywall issues found\n');
+      return;
+    }
+
+    // Group by provider
+    const byProvider = {};
+    result.issues.forEach(issue => {
+      const provider = issue.provider || 'unknown';
+      if (!byProvider[provider]) byProvider[provider] = [];
+      byProvider[provider].push(issue);
+    });
+
+    Object.entries(byProvider).forEach(([provider, issues]) => {
+      console.log(`${provider} (${issues.length} issues):`);
+      console.log('─'.repeat(64));
+      issues.forEach(issue => {
+        const icon = issue.severity === 'ERROR' ? '✗' : issue.severity === 'WARNING' ? '⚠' : 'ℹ';
+        console.log(`  ${icon} ${rel(issue.file)}:${issue.line}`);
+        console.log(`    ${issue.message}`);
+        console.log(`    → ${issue.suggestion}`);
+        console.log('');
+      });
+    });
+  });
 
 program.parse();

@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const acorn = require('acorn');
 const jsx = require('acorn-jsx');
-const walk = require('acorn-walk');
+const { simple: walkSimple } = require('../utils/ast-walk');
 
 class TestCoverageDetector {
   constructor() {
@@ -101,7 +101,7 @@ class TestCoverageDetector {
         allowReturnOutsideFunction: true
       });
 
-      walk.simple(ast, {
+      walkSimple(ast, {
         FunctionDeclaration: (node) => {
           const name = node.id?.name;
           if (name && !name.startsWith('_') && name !== 'constructor') {

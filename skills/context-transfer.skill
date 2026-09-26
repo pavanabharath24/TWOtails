@@ -1,0 +1,190 @@
+# Project Context Transfer Skill
+
+Transfer project knowledge from one AI tool to another (Antigravity → OpenCode, Cursor → Claude, etc.)
+
+## Problem
+
+You're working in Tool A (Antigravity, Cursor, etc.) and hit limits. Need to continue in Tool B (OpenCode, Claude Code). But Tool B doesn't know your project.
+
+## Solution
+
+Save project context to files. Any AI tool reads these files and instantly knows your project.
+
+## How to Use
+
+### Step 1: Export from Current Tool
+
+In your current AI tool (Antigravity, Cursor, etc.), type:
+
+```
+Save project context to CONTEXT.md
+```
+
+or
+
+```
+Export what you know about this project to a file
+```
+
+### Step 2: The AI Will Create These Files
+
+```
+your-project/
+├── CONTEXT.md           <- Everything the AI knows
+├── TODO.md              <- What's left to do
+├── DECISIONS.md         <- Architecture choices made
+├── PROGRESS.md          <- What's completed
+└── .ai-context/
+    ├── project.md       <- Project overview
+    ├── tech-stack.md    <- Technologies used
+    ├── files.md         <- Key files explained
+    └── issues.md        <- Problems encountered
+```
+
+### Step 3: Open in New Tool
+
+In OpenCode (or any new tool), type:
+
+```
+Read CONTEXT.md and continue where we left off
+```
+
+or
+
+```
+Load project context from .ai-context/ folder
+```
+
+### Step 4: AI Now Knows Everything
+
+The new AI reads the files and knows:
+- What you're building
+- What's done
+- What's left
+- Architecture decisions
+- Key files
+- Issues encountered
+
+## Quick Commands
+
+### In Antigravity/Cursor (Before You Hit Limit)
+
+```
+/create-context
+```
+
+```
+/save-project-state
+```
+
+```
+/export-to-file
+```
+
+### In OpenCode/Claude (New Session)
+
+```
+/load-context
+```
+
+```
+/continue-project
+```
+
+```
+/import-state
+```
+
+## What Gets Saved
+
+| File | Contains |
+|------|----------|
+| `CONTEXT.md` | Full project summary, current state, next steps |
+| `TODO.md` | Tasks remaining, priorities |
+| `DECISIONS.md` | Architecture choices, why they were made |
+| `PROGRESS.md` | What's completed, what's in progress |
+| `project.md` | Project name, description, goals |
+| `tech-stack.md` | Languages, frameworks, tools used |
+| `files.md` | Key files, what they do |
+| `issues.md` | Problems encountered, solutions found |
+
+## Example
+
+### Before Hitting Limit (Antigravity)
+
+```
+You: Create CONTEXT.md with everything you know about this project
+```
+
+AI creates:
+```markdown
+# Project: TWOTails v3.1
+
+## What We're Building
+AI code quality analyzer with 14 scanners, 12 languages
+
+## Current State
+- 44/44 tests passing
+- Multi-language support added (Python, Go, Java, Ruby)
+- Need to push to GitHub
+
+## Next Steps
+1. Fix unused variables in scanner code
+2. Update README with examples
+3. Push to GitHub repo
+
+## Key Files
+- src/index.js - CLI entry point
+- src/analyzer/multi-language-analyzer.js - New language support
+- tests/analyzer.test.js - All tests
+
+## Architecture
+- 13 original scanners + 1 multi-language scanner
+- Uses Acorn for JS/TS AST parsing
+- Uses Python ast module via child process
+- Regex-based for Go, Java, Ruby, etc.
+```
+
+### Continuing in OpenCode
+
+```
+You: Read CONTEXT.md and continue from where we left off
+```
+
+AI reads file and knows:
+- Project is TWOTails v3.1
+- 44 tests passing
+- Need to fix unused variables
+- Then push to GitHub
+
+**You don't have to explain anything.**
+
+## Auto-Generate Context Script
+
+```bash
+# Run this before switching tools
+node -e "
+const fs = require('fs');
+const path = require('path');
+
+const context = {
+  project: 'Your Project Name',
+  description: 'What it does',
+  status: 'Current state',
+  nextSteps: ['Task 1', 'Task 2'],
+  keyFiles: ['src/main.js', 'tests/test.js'],
+  techStack: ['Node.js', 'React', 'PostgreSQL']
+};
+
+fs.writeFileSync('CONTEXT.md', JSON.stringify(context, null, 2));
+console.log('Context saved to CONTEXT.md');
+"
+```
+
+## Tips
+
+1. **Save often** - Update context before hitting limits
+2. **Be specific** - "Fixed bug in line 45 of scanner.js" not "Fixed bug"
+3. **Include errors** - Save error messages you're stuck on
+4. **List next steps** - So new AI knows what to do
+5. **Keep it updated** - Delete completed items, add new ones

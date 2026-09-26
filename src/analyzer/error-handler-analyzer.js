@@ -4,10 +4,9 @@
  */
 
 const fs = require('fs');
-const path = require('path');
 const acorn = require('acorn');
 const jsx = require('acorn-jsx');
-const walk = require('acorn-walk');
+const { simple: walkSimple } = require('../utils/ast-walk');
 
 // Error handling patterns
 const ERROR_PATTERNS = {
@@ -161,7 +160,7 @@ class ErrorHandlerAnalyzer {
         allowReturnOutsideFunction: true
       });
 
-      walk.simple(ast, {
+      walkSimple(ast, {
         // Find async functions
         FunctionDeclaration: (node) => {
           if (node.async) {

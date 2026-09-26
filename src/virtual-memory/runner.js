@@ -6,7 +6,6 @@
 const fs = require('fs');
 const path = require('path');
 const { SandboxRunner } = require('./sandbox-runner');
-const { globalCleanup } = require('./memory-cleanup');
 
 // ─── HTML Generator from JSX/TSX ───────────────────────────────
 function generateTestHTML(filePath, content) {
