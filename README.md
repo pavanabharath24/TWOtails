@@ -607,9 +607,7 @@ rate: 0% across the 72-test suite.
 Yes. Run `npx playwright install chromium` after installing.
 
 
-## Contributions
 
-![Contribution graph](assets/contributions.svg)
 
 The graph is generated from this repository's git history. Regenerate it after
 pushing new commits:
