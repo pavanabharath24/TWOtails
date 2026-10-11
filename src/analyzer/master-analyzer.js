@@ -20,6 +20,12 @@ const { DockerAnalyzer } = require('./docker-analyzer');
 const { WebSocketAnalyzer } = require('./websocket-analyzer');
 const { TestCoverageDetector } = require('./test-coverage-detector');
 const { MultiLanguageAnalyzer } = require('./multi-language-analyzer');
+const { CICDWorkflowAnalyzer } = require('./cicd-analyzer');
+const { FunctionalTestHarness } = require('./functional-test-harness');
+const { FailureScenarioRegistry } = require('./failure-scenario-framework');
+const { ReliabilityScorer } = require('./reliability-scorer');
+const { AgentRunner } = require('./agent-runner');
+
 
 // Extension -> language for the language breakdown shown on every scan
 const LANGUAGE_BY_EXT = {
@@ -53,7 +59,13 @@ class MasterAnalyzer {
       docker: new DockerAnalyzer(),
       websocket: new WebSocketAnalyzer(),
       testCoverage: new TestCoverageDetector(),
-      multiLanguage: new MultiLanguageAnalyzer()
+      multiLanguage: new MultiLanguageAnalyzer(),
+      cicd: new CICDWorkflowAnalyzer(),
+      functionalTest: new FunctionalTestHarness(),
+      failureScenario: new FailureScenarioRegistry(),
+      reliabilityScorer: new ReliabilityScorer(),
+      agentRunner: new AgentRunner(),
+
     };
   }
 
