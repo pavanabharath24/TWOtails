@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/github/stars/pavana/TWOtails?style=flat-square&color=0ea5e9&label=stars" alt="Stars">
   <img src="https://img.shields.io/github/v/release/pavana/TWOtails?style=flat-square&color=0ea5e9&label=release" alt="Release">
   <img src="https://img.shields.io/npm/v/@pavana/twotails?style=flat-square&color=0ea5e9&label=npm" alt="npm">
-  <img src="https://img.shields.io/badge/tests-55%2F55%20%2B%2017%20Playwright-0ea5e9?style=flat-square" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-57%2F57%20%2B%2017%20Playwright-0ea5e9?style=flat-square" alt="Tests">
 </p>
 
 ---
@@ -92,7 +92,7 @@ agent can run it after every change and still stay fast.
   <img src="https://img.shields.io/badge/Scanners-14-0ea5e9?style=flat-square" alt="Scanners">
   <img src="https://img.shields.io/badge/Read--Only-100%25-0ea5e9?style=flat-square" alt="Read only">
   <img src="https://img.shields.io/badge/False%20Positives-0-0ea5e9?style=flat-square" alt="Zero false positives">
-  <img src="https://img.shields.io/badge/Tests-72-0ea5e9?style=flat-square" alt="72 tests">
+  <img src="https://img.shields.io/badge/Tests-74-0ea5e9?style=flat-square" alt="74 tests">
 </p>
 
 
@@ -460,7 +460,7 @@ cp .github/copilot-instructions.md <your-project>/.github/
 
 ## Accuracy
 
-Verified by the 72-test regression suite: clean source scans report **zero**
+Verified by the 74-test regression suite: clean source scans report **zero**
 issues, broken fixtures report **only** true positives, and no duplicate issues
 survive the AST + signal pipeline.
 
@@ -488,8 +488,8 @@ npm install
 npx playwright install chromium
 
 # Run tests
-npm test                    # 55/55 analyzer tests
-npm run test:virtual        # 17/17 Playwright tests (72 total)
+npm test                    # 57/57 analyzer tests
+npm run test:virtual        # 17/17 Playwright tests (74 total)
 
 # Run the scanner
 node src/index.js scan ./examples/broken-app
@@ -601,7 +601,7 @@ Yes. `twotails scan` exits with code 1 if errors found.
 **What about false positives?**
 TWOtails uses bidirectional tracing — a signal from the sender end and a signal
 from the receiver end must collide before anything is reported. False positive
-rate: 0% across the 72-test suite.
+rate: 0% across the 74-test suite.
 
 **Does virtual memory need Playwright?**
 Yes. Run `npx playwright install chromium` after installing.

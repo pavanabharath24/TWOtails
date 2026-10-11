@@ -342,6 +342,37 @@ API_SECRET=changeme123
       fs.rmSync(testDir, { recursive: true });
     }
   });
+
+  it('should detect missing .env and .env.example files', async () => {
+    const testDir = path.join(__dirname, '..', 'examples', 'env-missing-test');
+    fs.mkdirSync(testDir, { recursive: true });
+    fs.writeFileSync(path.join(testDir, 'app.js'), 'const x = process.env.SOME_KEY;\n');
+
+    try {
+      const analyzer = new EnvironmentAnalyzer();
+      const result = await analyzer.analyzeDirectory(testDir);
+      const types = result.issues.map(i => i.type);
+      assert.ok(types.includes('MISSING_ENV_FILE'), 'Should report missing .env file');
+      assert.ok(types.includes('MISSING_ENV_EXAMPLE'), 'Should report missing .env.example file');
+    } finally {
+      fs.rmSync(testDir, { recursive: true });
+    }
+  });
+
+  it('should not report missing .env when .env.example exists', async () => {
+    const testDir = path.join(__dirname, '..', 'examples', 'env-example-test');
+    fs.mkdirSync(testDir, { recursive: true });
+    fs.writeFileSync(path.join(testDir, '.env.example'), 'API_KEY=\n');
+
+    try {
+      const analyzer = new EnvironmentAnalyzer();
+      const result = await analyzer.analyzeDirectory(testDir);
+      const types = result.issues.map(i => i.type);
+      assert.ok(!types.includes('MISSING_ENV_EXAMPLE'), 'Should not report missing .env.example');
+    } finally {
+      fs.rmSync(testDir, { recursive: true });
+    }
+  });
 });
 
 // ─── Prompt Scanner Tests ─────────────────────────────────────
