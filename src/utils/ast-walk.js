@@ -1,17 +1,34 @@
 /**
  * JSX-aware acorn-walk helpers
  *
- * acorn-walk has no walker functions for JSX node types, so walking any
- * file containing JSX throws "No walker function defined for node type
- * JSXElement". Analyzers used to swallow that error and fall back to
- * regex parsing, which produced duplicate issues and wrong parameter
- * counts. This module extends the acorn-walk base with complete JSX
- * support so every analyzer walks the real AST exactly once.
+ * acorn-walk has no walker functions for JSX node types, and its base
+ * walker is missing handlers for some newer ECMAScript node types.
+ * This module extends the acorn-walk base with complete JSX support
+ * and missing standard node type handlers so every analyzer walks
+ * the real AST exactly once.
  */
 
 const walk = require('acorn-walk');
 
-const jsxBase = walk.make({
+/**
+ * Handlers for node types missing from acorn-walk's base walker.
+ * These are newer ECMAScript features that the base walker doesn't handle.
+ */
+const missingBase = {
+  OptionalMemberExpression(node, st, c) { c(node.object, st); c(node.property, st); },
+  OptionalCallExpression(node, st, c) { c(node.callee, st); node.arguments.forEach(arg => c(arg, st)); },
+  NullishCoalescingExpression(node, st, c) { c(node.left, st); c(node.right, st); },
+  GeneratorFunction(node, st, c) {
+    if (node.id) c(node.id, st);
+    if (node.params) node.params.forEach(p => c(p, st));
+    c(node.body, st);
+  }
+};
+
+/**
+ * JSX node type handlers
+ */
+const jsxBase = {
   JSXElement(node, st, c) {
     c(node.openingElement, st);
     node.children.forEach(child => c(child, st));
@@ -49,18 +66,21 @@ const jsxBase = walk.make({
   JSXMemberExpression() {},
   JSXText() {},
   JSXEmptyExpression() {}
-}, walk.base);
+};
+
+// Merge: base walker + missing handlers + JSX handlers
+const mergedBase = { ...walk.base, ...missingBase, ...jsxBase };
 
 function simple(node, visitors, state) {
-  return walk.simple(node, visitors, jsxBase, state);
+  return walk.simple(node, visitors, mergedBase, state);
 }
 
 function recursive(node, visitors, state, override) {
-  return walk.recursive(node, state, visitors, jsxBase, override);
+  return walk.recursive(node, state, visitors, mergedBase, override);
 }
 
 function full(node, callback) {
-  return walk.full(node, callback, jsxBase);
+  return walk.full(node, callback, mergedBase);
 }
 
-module.exports = { simple, recursive, full, jsxBase };
+module.exports = { simple, recursive, full, mergedBase };
