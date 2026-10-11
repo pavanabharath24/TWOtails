@@ -5,7 +5,7 @@
 <h1 align="center">TWOtails</h1>
 
 <p align="center">
-  <em>AI Code Quality Analyzer - 14 scanners, 12 languages, 1 truth, zero false positives</em>
+  <em>AI Code Quality Analyzer - 20 scanners, 12 languages, 1 truth, zero false positives</em>
 </p>
 
 <p align="center">
@@ -21,10 +21,11 @@
 
 When AI writes your code, something small is always missing. A button with no
 click handler. A function that is called but never written. A password hiding
-in the code. A database table that was never created. AI moves fast — and it
+in the code. A database table that was never created. A CI/CD workflow with
+unpinned actions. A container with wrong health check. AI moves fast — and it
 leaves these small holes behind.
 
-**TWOtails is a code checker made for AI-written code.** It works as a skill
+**TWOtails is a unified evaluation platform for AI-written code.** It works as a skill
 and CLI for **Antigravity, Cursor, Claude Code, Codex, GitHub Copilot,
 OpenCode**, and any agent that reads `AGENTS.md`. You run one command, and it
 reads your whole project and tells you exactly what is broken, what is missing,
@@ -38,11 +39,16 @@ suggestion.
   it should be received. That is the "two tails" method. If both ends match,
   the code is fine. If one end is missing, it reports a bug. Because both
   sides must match before anything is reported, you get **zero false alarms**
-- **Runs 14 scanners** that look for different problems: broken connections,
-  database mistakes, unsafe API routes, security holes, weak environment
-  settings, missing tests, debug leftovers, and more
+- **Runs 20 scanners** across 4 categories:
+  - **Code Quality** (7): Connectivity, Database, API Routes, AI Quality, Security, Environment, Error Handling
+  - **Dependencies & Infrastructure** (5): Dependencies, Docker, WebSocket, Test Coverage, Multi-Language
+  - **CI/CD & Operations** (5): CI/CD Workflows, Functional Tests, Prompt Security, Tokens, Dependencies
+  - **AI Evaluation** (3): Failure Scenarios, Agent Runner, Reliability Scoring
 - **Understands 12 languages**: JavaScript, TypeScript, Python, Go, Java,
   Ruby, Rust, PHP, C#, Swift, Kotlin, Scala
+- **Runs functional tests** in isolated Docker containers (build, test, lint)
+- **Evaluates AI agents** on deterministic failure scenarios with ground truth
+- **Produces transparent reliability scores** — componentized, not opaque
 - **Never changes your code** — it only reports problems and shows suggestions
 
 ### How it helps AI agents and AI tools
@@ -57,6 +63,13 @@ eyes** for the agent:
 3. TWOtails returns a clear list: file, line, problem, and fix
 4. The agent fixes only the real problems — no guessing, no wasted turns
 
+**For DevOps failures**, TWOtails goes further — it runs the agent against
+deterministic failure scenarios (wrong env var, port mismatch, OOM kill, bad
+health check, etc.) and scores:
+- **Diagnosis accuracy** — did the agent find the real root cause?
+- **Reproduction success** — can the steps reliably reproduce the failure?
+- **Verified recovery** — does the fix actually pass health checks?
+
 This stops the agent from looping over the same bug again and again, saves you
 from reading every line of AI code by hand, and keeps broken code out of
 production. A full scan takes about **1 second for a 50-file project**, so an
@@ -69,6 +82,8 @@ agent can run it after every change and still stay fast.
 - **Teams** that review a lot of AI-generated code every day
 - **CI/CD pipelines** — `twotails scan` exits with error code 1 if broken code is found, so bad code never merges
 - **Code reviewers** who want a pre-checked list of problems before they start reading
+- **Platform engineers** evaluating AI agents for DevOps automation
+- **Researchers** benchmarking AI agent reliability on DevOps tasks
 
 ## Profile
 
@@ -80,7 +95,7 @@ agent can run it after every change and still stay fast.
   <tr>
     <td align="center" width="25%"><b>AST Parsing</b><br>Acorn + JSX-aware walkers<br>JavaScript · TypeScript</td>
     <td align="center" width="25%"><b>Bidirectional Tracing</b><br>Sender + receiver signals<br>Zero false positives</td>
-    <td align="center" width="25%"><b>14 Scanners</b><br>Connectivity · Security · DB<br>API · AI Quality · more</td>
+    <td align="center" width="25%"><b>20 Scanners</b><br>Code · CI/CD · AI Eval<br>Infra · Security · more</td>
     <td align="center" width="25%"><b>Virtual Memory</b><br>Real Playwright browsers<br>UI tests in sandboxes</td>
   </tr>
 </table>
@@ -89,7 +104,7 @@ agent can run it after every change and still stay fast.
   <img src="https://img.shields.io/badge/AST-Acorn%20%2B%20JSX-0ea5e9?style=flat-square" alt="AST">
   <img src="https://img.shields.io/badge/Tracing-Bidirectional%20two--signal-0ea5e9?style=flat-square" alt="Tracing">
   <img src="https://img.shields.io/badge/Languages-12-0ea5e9?style=flat-square" alt="Languages">
-  <img src="https://img.shields.io/badge/Scanners-14-0ea5e9?style=flat-square" alt="Scanners">
+  <img src="https://img.shields.io/badge/Scanners-20-0ea5e9?style=flat-square" alt="Scanners">
   <img src="https://img.shields.io/badge/Read--Only-100%25-0ea5e9?style=flat-square" alt="Read only">
   <img src="https://img.shields.io/badge/False%20Positives-0-0ea5e9?style=flat-square" alt="Zero false positives">
   <img src="https://img.shields.io/badge/Tests-74-0ea5e9?style=flat-square" alt="74 tests">
@@ -113,30 +128,39 @@ agent can run it after every change and still stay fast.
 | **Kotlin** | `.kt` | Non-null assertion, println detection |
 | **Scala** | `.scala` | Option.get, pattern matching |
 
-## 14 Scanners, 1 Command
+## 20 Scanners, 1 Command
 
 ```bash
-twotails scan ./src        # Runs ALL 14 scanners across 12 languages
+twotails scan ./src        # Runs ALL 20 scanners across 12 languages
 twotails languages ./src   # Multi-language scanner only (Python, Go, Java, etc.)
 twotails paywall ./src     # Paywall connection verifier (RevenueCat, Stripe, Paddle)
+twotails cicd ./src        # CI/CD workflow analysis (GitHub Actions)
+twotails test-suite ./src  # Functional test harness (build/test/lint in Docker)
+twotails evaluate ./src    # Full evaluation: static + CI/CD + tests + scenarios
 ```
 
-| # | Scanner | What It Finds |
-|---|---------|---------------|
-| 1 | **Connectivity** | Undefined functions, missing handlers, unused imports, parameter mismatches |
-| 2 | **Database** | Missing models, broken queries, missing awaits, unused models, broken relations |
-| 3 | **API Routes** | Missing handlers, unvalidated inputs, missing auth, duplicate routes |
-| 4 | **AI Quality** | Fake packages, deprecated patterns, empty catch blocks, debug statements |
-| 5 | **Security** | Hardcoded secrets, SQL injection, XSS, command injection, weak crypto |
-| 6 | **Environment** | Missing env vars, weak secrets, missing .env files, config issues |
-| 7 | **Prompts** | Prompt injection, jailbreak patterns, unsafe system prompts |
-| 8 | **Tokens** | Token counting, LLM cost estimation, large file detection |
-| 9 | **Error Handling** | Empty catch blocks, missing error handlers, uncaught promises |
-| 10 | **Dependencies** | Vulnerable packages, deprecated packages, outdated dependencies |
-| 11 | **Docker** | Dockerfile security, missing .dockerignore, container best practices |
-| 12 | **WebSocket** | Missing reconnection logic, no heartbeat, connection issues |
-| 13 | **Test Coverage** | Untested functions, missing test files, coverage gaps |
-| 14 | **Multi-Language** | Python, Go, Java, Ruby, Rust, PHP, C#, Swift, Kotlin, Scala issues |
+| # | Scanner | Category | What It Finds |
+|---|---------|----------|---------------|
+| 1 | **Connectivity** | Code Quality | Undefined functions, missing handlers, unused imports, parameter mismatches |
+| 2 | **Database** | Code Quality | Missing models, broken queries, missing awaits, unused models, broken relations |
+| 3 | **API Routes** | Code Quality | Missing handlers, unvalidated inputs, missing auth, duplicate routes |
+| 4 | **AI Quality** | Code Quality | Fake packages, deprecated patterns, empty catch blocks, debug statements |
+| 5 | **Security** | Code Quality | Hardcoded secrets, SQL injection, XSS, command injection, weak crypto |
+| 6 | **Environment** | Code Quality | Missing env vars, weak secrets, missing .env files, config issues |
+| 7 | **Error Handling** | Code Quality | Empty catch blocks, missing error handlers, uncaught promises |
+| 8 | **Prompts** | AI Safety | Prompt injection, jailbreak patterns, unsafe system prompts |
+| 9 | **Tokens** | AI Safety | Token counting, LLM cost estimation, large file detection |
+| 10 | **Dependencies** | Infra | Vulnerable packages, deprecated packages, outdated dependencies |
+| 11 | **Docker** | Infra | Dockerfile security, missing .dockerignore, container best practices |
+| 12 | **WebSocket** | Infra | Missing reconnection logic, no heartbeat, connection issues |
+| 13 | **Test Coverage** | Infra | Untested functions, missing test files, coverage gaps |
+| 14 | **Multi-Language** | Code Quality | Python, Go, Java, Ruby, Rust, PHP, C#, Swift, Kotlin, Scala issues |
+| 15 | **CI/CD Workflows** | CI/CD Ops | GitHub Actions syntax, triggers, jobs, action pinning, permissions, secrets |
+| 16 | **Functional Tests** | CI/CD Ops | Build/test/lint execution in isolated Docker containers |
+| 17 | **Failure Scenarios** | AI Eval | 8 deterministic DevOps failures with ground truth (wrong env, port mismatch, OOM, etc.) |
+| 18 | **Reliability Scorer** | AI Eval | Transparent weighted scoring for CI/CD and failure reproduction |
+| 19 | **Agent Runner** | AI Eval | Bounded prompt/tool interface for AI agent evaluation |
+| 20 | **Unified Evaluator** | AI Eval | Single pipeline: static + CI/CD + tests + scenarios + agent eval |
 
 Plus a standalone **Paywall Connection** checker (`twotails paywall`) that verifies RevenueCat, Stripe, Paddle, App Store, and Play Store integrations are wired end to end.
 
@@ -343,7 +367,130 @@ reported when both the sender end (call, fetch, emit) and the receiver end
 (definition, listener, handler) have been traced. One-sided evidence is never
 enough — that's how TWOtails keeps false positives at zero.
 
-## Virtual Memory Testing
+## CI/CD Workflow Analysis (`twotails cicd`)
+
+Analyzes GitHub Actions workflow files for correctness and security:
+
+```bash
+twotails cicd ./
+```
+
+**Checks performed:**
+- **Syntax & Schema** — Valid YAML, required triggers, proper structure
+- **Triggers** — Missing `push`/`pull_request`, dangerous `workflow_dispatch`
+- **Jobs** — Missing `runs-on`, timeouts, empty steps, self-hosted labels
+- **Action Pinning** — Unpinned actions, major-version-only pins, local actions
+- **Permissions** — Missing explicit permissions, `write-all`, broad writes
+- **Secrets** — Hardcoded secrets in env, missing `${{ secrets. }}` usage
+- **Security Practices** — `curl | bash`, missing `set -euo pipefail`, `sudo` usage
+- **Required Steps** — Missing `actions/checkout`, missing `setup-*` for language
+- **Concurrency** — Missing `cancel-in-progress` for PR/branch protection
+
+**Reliability Score** — Each workflow gets a 0–100 score with component breakdown.
+
+## Functional Test Harness (`twotails test-suite`)
+
+Runs actual builds, tests, and linting in isolated Docker containers:
+
+```bash
+twotails test-suite ./src
+```
+
+**Features:**
+- **Isolated Execution** — Each run in fresh container, no network, 512MB RAM, 0.5 CPU
+- **Multi-Language** — Node.js, Python, Go, Java, Ruby, Rust, PHP, .NET, etc.
+- **Phased Execution** — Build → Test → Lint (stops on first failure)
+- **Artifact Collection** — Stdout, stderr, exit codes, duration per phase
+- **Cleanup Guaranteed** — Containers auto-removed, temp dirs cleaned
+
+**Use Cases:**
+- Verify AI-generated code actually builds and passes tests
+- Run in CI/CD to catch integration issues before merge
+- Validate that fixes actually work in clean environment
+
+## Failure Reproduction Framework (`twotails evaluate --scenarios`)
+
+Evaluates AI agents on 8 deterministic DevOps failure scenarios with ground truth:
+
+| Scenario | Category | Root Cause |
+|----------|----------|------------|
+| `wrong-env-var` | Config | DATABASE_URL points to wrong host |
+| `port-mismatch` | Network | App listens on 3000, Dockerfile exposes 8080 |
+| `oom-killed` | Resource | Container memory limit too low |
+| `bad-health-check` | Health | HEALTHCHECK uses `/health`, app exposes `/healthz` |
+| `missing-dependency` | Dependency | Missing `libpq` in Alpine base image |
+| `permission-denied` | Permission | App writes to root-owned directory as non-root |
+| `expired-credential` | Config | API token expired, service returns 401 |
+| `cpu-throttled` | Resource | CPU quota too low for workload |
+
+**Evaluation Protocol:**
+1. **Setup** — Clean environment with sample service
+2. **Fault Injection** — Apply controlled fault (env var, port, limit, etc.)
+3. **Verify Failure** — Confirm observable failure (health check fails)
+4. **Agent Diagnosis** — Agent analyzes evidence, produces root cause
+5. **Reproduction** — Agent provides steps to reproduce in clean env
+6. **Recovery** — Agent proposes fix, verification steps
+7. **Ground Truth Scoring** — Compare to known root cause, reproduction, fix
+
+## Reliability Scoring (Transparent, Componentized)
+
+Both CI/CD and Failure Reproduction use transparent weighted scoring — **not a single opaque number**:
+
+**CI/CD Workflow Score Components:**
+| Component | Weight | What It Measures |
+|-----------|--------|------------------|
+| Syntax | 15% | Valid YAML, no parse errors |
+| Triggers | 10% | Required push/PR triggers present |
+| Jobs | 10% | Runs-on, timeouts, steps defined |
+| Action Pinning | 15% | All actions pinned to SHA/version |
+| Permissions | 15% | Minimal explicit permissions |
+| Secrets | 15% | No hardcoded secrets, proper usage |
+| Security | 10% | No curl\|bash, set -e, no sudo |
+| Concurrency | 5% | Cancel-in-progress configured |
+| Required Steps | 5% | Checkout, setup-* present |
+
+**Failure Reproduction Score Components:**
+| Component | Weight | What It Measures |
+|-----------|--------|------------------|
+| Diagnosis | 40% | Root cause matches ground truth (F1 score) |
+| Reproduction | 30% | Steps reliably reproduce in clean env |
+| Recovery | 30% | Fix addresses root cause, verified |
+
+**Scores are aggregated** across workflows/scenarios with variance tracking for repeatability.
+
+## Agent Runner & Unified Evaluation
+
+Run AI agents against failure scenarios with bounded prompt/tool interface:
+
+```bash
+# Evaluate an agent on all scenarios
+twotails evaluate ./src --agent-config agent.json --scenarios all
+
+# Evaluate specific scenario with repeatability testing
+twotails evaluate ./src --agent-config agent.json --scenarios wrong-env-var --repeat 5
+```
+
+**Agent Config (`agent.json`):**
+```json
+{
+  "provider": "anthropic",
+  "model": "claude-3-5-sonnet",
+  "apiKey": "sk-...",
+  "maxSteps": 20,
+  "stepTimeout": 60000
+}
+```
+
+**Unified Evaluation Pipeline (`twotails evaluate`):**
+Runs the complete pipeline in one command:
+1. **Static Analysis** — 14 code quality scanners
+2. **CI/CD Analysis** — GitHub Actions workflow checks
+3. **Functional Tests** — Build/test/lint in Docker
+4. **Scenario Evaluation** — Deterministic failure checks
+5. **Agent Evaluation** — AI agent on scenarios (optional)
+6. **Unified Reliability Score** — Weighted aggregate with component breakdown
+
+**Output:** JSON report + human-readable table with component scores, pass/fail, evidence.
 
 Real Playwright browser testing for UI components:
 
@@ -374,8 +521,11 @@ twotails test ./
 
 | Command | Description | Options |
 |---------|-------------|---------|
-| `twotails scan [dir]` | Full analysis (all 14 scanners) | `-e`, `-i`, `-s`, `--json` |
+| `twotails scan [dir]` | Full analysis (all 20 scanners) | `-e`, `-i`, `-s`, `--json` |
 | `twotails languages [dir]` | Multi-language scan (Python, Go, Java, etc.) | `-i`, `--json` |
+| `twotails cicd [dir]` | CI/CD workflow analysis (GitHub Actions) | `-i`, `--json` |
+| `twotails test-suite [dir]` | Functional test harness (build/test/lint in Docker) | `-i`, `--json`, `-t` |
+| `twotails evaluate [dir]` | Full unified evaluation pipeline | `--agent-config`, `--scenarios`, `--repeat`, `--json` |
 | `twotails connectivity [dir]` | Only connectivity checks | `-e`, `-i` |
 | `twotails database [dir]` | Only database checks | `-i` |
 | `twotails api [dir]` | Only API route checks | `-i` |
@@ -400,6 +550,9 @@ twotails test ./
 - `-s, --severity <level>` - Minimum severity: ERROR, WARNING, INFO
 - `--json` - Output as JSON
 - `-t, --timeout <ms>` - Test timeout in ms (default: 30000)
+- `--agent-config <file>` - Agent configuration JSON (for `evaluate`)
+- `--scenarios <list>` - Comma-separated scenario IDs or `all` (for `evaluate`)
+- `--repeat <n>` - Number of repetitions per scenario (for `evaluate`)
 
 ## Integration
 
@@ -497,6 +650,9 @@ node src/index.js scan ./examples/broken-app
 # Run specific scanner
 node src/index.js security ./examples/broken-app
 node src/index.js database ./examples/broken-app
+node src/index.js cicd ./examples/broken-app
+node src/index.js test-suite ./examples/broken-app
+node src/index.js evaluate ./examples/broken-app
 
 # Run multi-language scanner
 node src/index.js languages ./examples/python-app
@@ -530,7 +686,13 @@ TWOtails/
 │   │   ├── test-coverage-detector.js # Test coverage detector
 │   │   ├── multi-language-analyzer.js # Python, Go, Java, Ruby, Rust, PHP, C#, Swift, Kotlin, Scala
 │   │   ├── paywall-analyzer.js     # Paywall connection verifier
-│   │   └── master-analyzer.js     # Combines all 14 scanners
+│   │   ├── cicd-analyzer.js       # GitHub Actions workflow analyzer
+│   │   ├── functional-test-harness.js # Docker-isolated build/test/lint runner
+│   │   ├── failure-scenario-framework.js # 8 deterministic DevOps failure scenarios
+│   │   ├── reliability-scorer.js  # Transparent weighted scoring engine
+│   │   ├── agent-runner.js        # Bounded AI agent evaluation interface
+│   │   ├── unified-evaluator.js   # Unified evaluation pipeline
+│   │   └── master-analyzer.js     # Combines all 20 scanners
 │   ├── utils/
 │   │   └── ast-walk.js             # JSX-aware AST walkers
 │   ├── tracer/
@@ -546,7 +708,7 @@ TWOtails/
 ├── scripts/                       # Context export/import utilities
 ├── skills/                        # AI agent skill definitions
 ├── hooks/                         # Agent lifecycle hooks
-├── tests/                         # 55+ tests
+├── tests/                         # 57 tests + 17 Playwright = 74 total
 ├── examples/
 │   ├── broken-app/                # Test app with intentional issues
 │   ├── fixed-app/                 # Clean test app
@@ -554,7 +716,6 @@ TWOtails/
 │   ├── go-app/                    # Go test examples
 │   ├── java-app/                  # Java test examples
 │   └── ruby-app/                  # Ruby test examples
-└── .opencode/                     # OpenCode plugin
 ```
 
 ## FAQ
